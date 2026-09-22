@@ -1,26 +1,123 @@
 @import "tailwindcss";
+@import "sweetalert2/dist/sweetalert2.min.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  --color-primary: #9e001f;
+  --color-primary-container: #c8102e;
+  --color-on-primary: #ffffff;
+  --color-primary-fixed: #ffdad8;
+  --color-on-primary-fixed: #410007;
+  --color-on-primary-fixed-variant: #92001c;
+  --color-on-primary-container: #ffdad8;
+  --color-background: #f9f9ff;
+  --color-on-background: #111c2d;
+  --color-surface: #f9f9ff;
+  --color-on-surface: #111c2d;
+  --color-on-surface-variant: #5c403f;
+  --color-surface-container: #e7eeff;
+  --color-surface-container-low: #f0f3ff;
+  --color-surface-container-high: #dee8ff;
+  --color-surface-container-highest: #d8e3fb;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-variant: #d8e3fb;
+  --color-secondary: #5c5f61;
+  --color-secondary-container: #e0e3e5;
+  --color-outline: #906f6e;
+  --color-outline-variant: #e5bdbb;
+  --color-tertiary: #00583b;
+  --color-tertiary-container: #00734e;
+  --color-tertiary-fixed: #6ffbbe;
+  --color-tertiary-fixed-dim: #4edea3;
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+  --color-inverse-primary: #ffb3b1;
+  --color-amber: #d97706;
+  --color-amber-soft: #fef3c7;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --spacing-xs: 4px;
+  --spacing-sm: 12px;
+  --spacing-md: 24px;
+  --spacing-lg: 32px;
+  --spacing-xl: 48px;
+  --spacing-gutter: 16px;
+  --spacing-margin-desktop: 32px;
+  --spacing-margin-mobile: 12px;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --text-display-lg: 36px;
+  --text-display-lg--line-height: 44px;
+  --text-display-lg--letter-spacing: -0.02em;
+  --text-display-lg--font-weight: 700;
+  --text-headline-lg: 26px;
+  --text-headline-lg--line-height: 34px;
+  --text-headline-lg--letter-spacing: -0.01em;
+  --text-headline-lg--font-weight: 600;
+  --text-headline-md: 20px;
+  --text-headline-md--line-height: 28px;
+  --text-headline-md--font-weight: 600;
+  --text-title-lg: 17px;
+  --text-title-lg--line-height: 24px;
+  --text-title-lg--font-weight: 600;
+  --text-title-md: 14px;
+  --text-title-md--line-height: 20px;
+  --text-title-md--font-weight: 600;
+  --text-body-lg: 15px;
+  --text-body-lg--line-height: 22px;
+  --text-body-md: 14px;
+  --text-body-md--line-height: 20px;
+  --text-body-sm: 12px;
+  --text-body-sm--line-height: 18px;
+  --text-label-md: 12px;
+  --text-label-md--line-height: 16px;
+  --text-label-md--letter-spacing: 0.05em;
+  --text-label-md--font-weight: 600;
+  --text-mono-md: 14px;
+  --text-mono-md--line-height: 20px;
+  --text-mono-md--font-weight: 500;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+  --radius-lg: 0.25rem;
+  --radius-xl: 0.75rem;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #f9f9ff;
+  color: #111c2d;
+  font-size: 14px;
+  line-height: 1.5;
 }
+
+html {
+  font-size: 14px;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  user-select: none;
+}
+
+.material-symbols-outlined.fill-icon {
+  font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+
+.shadow-level-1 {
+  box-shadow: 0px 2px 4px rgba(30, 41, 59, 0.05);
+}
+
+.shadow-level-2 {
+  box-shadow: 0px 10px 15px rgba(30, 41, 59, 0.1);
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+/* max-w-* no debe usar --spacing-md (24px); restaurar anchos estándar de Tailwind */
+.max-w-xs { max-width: 20rem !important; }
+.max-w-md { max-width: 28rem !important; }
+.max-w-xl { max-width: 36rem !important; }
+.max-w-4xl { max-width: 56rem !important; }
+.max-w-7xl { max-width: 80rem !important; }

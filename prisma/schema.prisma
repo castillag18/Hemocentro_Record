@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String   @default("")
+  passwordHash String
+  role         String   @default("admin")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Donor {
+  id               String        @id @default(cuid())
+  name             String
+  documentId       String        @unique
+  bloodType        String
+  gender           String?
+  donationType     String        @default("total")
+  birthDate        DateTime?
+  lastDonationDate DateTime
+  phone            String?
+  whatsappChatId   String?
+  email            String?
+  preferredChannel String        @default("ambos")
+  accepted         Boolean       @default(true)
+  active           Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  reminderLogs          ReminderLog[]
+  appointments          Appointment[]
+  whatsappBookingSessions WhatsAppBookingSession[]
+}
+
+model Settings {
+  id                      String    @id @default("default")
+  reminderDays            Int       @default(90)
+  femaleWholeBloodMonths  Int       @default(4)
+  femaleApheresisMonths   Int       @default(1)
+  maleWholeBloodMonths    Int       @default(3)
+  maleApheresisMonths     Int       @default(1)
+  smtpHost                String    @default("")
+  smtpPort                Int       @default(587)
+  smtpUser                String    @default("")
+  smtpPass                String    @default("")
+  smtpFrom                String    @default("")
+  appointmentLink         String    @default("")
+  siteName                String    @default("HUAV Banco de Sangre")
+  siteAddress             String    @default("")
+  sitePhone               String    @default("")
+  whatsappMode            String    @default("wame")
+  whatsappAccessToken     String    @default("")
+  whatsappPhoneNumberId   String    @default("")
+  whatsappApiVersion      String    @default("v21.0")
+  whatsappVerifyToken     String    @default("")
+  whatsappOpenWaUrl       String    @default("http://localhost:2785")
+  whatsappOpenWaApiKey    String    @default("")
+  whatsappOpenWaSessionId String    @default("hemocentro")
+  whatsappDailyLimit      Int       @default(1000)
+  autoRemindersEnabled    Boolean   @default(false)
+  autoRemindersHour       Int       @default(8)
+  autoBirthdayEnabled     Boolean   @default(false)
+  autoSpecialDatesEnabled Boolean   @default(false)
+  specialDatesJson        String?   @db.Text
+  googleCalendarId        String    @default("")
+  googleCredentialsJson   String?   @db.Text
+  googleRefreshToken      String?   @db.Text
+  googleAccessToken       String?   @db.Text
+  googleTokenExpiry       DateTime?
+  googleConnectedEmail    String    @default("")
+  googleClientId          String    @default("")
+  googleClientSecret      String    @default("")
+  openwaWebhookSecret     String    @default("")
+}
+
+model IpBlacklist {
+  id        String    @id @default(cuid())
+  ip        String    @unique
+  reason    String    @db.Text
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+}
+
+model MessageTemplate {
+  id        String   @id @default(cuid())
+  channel   String
+  kind      String   @default("reminder")
+  name      String
+  subject   String   @default("")
+  body      String   @db.Text
+  imageUrl  String   @default("")
+  updatedAt DateTime @updatedAt
+
+  @@unique([channel, kind])
+}
+
+model ReminderLog {
+  id              String   @id @default(cuid())
+  donorId         String
+  donor           Donor    @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  channel         String
+  status          String
+  messageKind     String   @default("reminder")
+  referenceKey    String   @default("")
+  sentAt          DateTime @default(now())
+  error           String?  @db.Text
+  donationDateRef DateTime
+
+  @@index([donorId, messageKind, referenceKey])
+}
+
+model Appointment {
+  id            String   @id @default(cuid())
+  donorId       String
+  donor         Donor    @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  scheduledAt   DateTime
+  googleEventId String?
+  status        String   @default("confirmada")
+  source        String   @default("whatsapp")
+  createdAt     DateTime @default(now())
+}
+
+model WhatsAppBookingSession {
+  id        String   @id @default(cuid())
+  donorId   String
+  donor     Donor    @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  phone     String
+  status    String   @default("active")
+  slotsJson String   @db.Text
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([donorId, status])
+  @@index([phone, status])
+}
