@@ -1,36 +1,37 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HUAV — Recordatorios de donantes
 
-## Getting Started
+Plataforma administrativa para **HUAV Banco de Sangre**: gestión de donantes, importación desde Excel, recordatorios periódicos por WhatsApp y correo.
 
-First, run the development server:
+## Inicio rápido
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+copy .env.example .env
+npm run local:setup
+npm run dev:fresh
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abra [http://localhost:3000/login](http://localhost:3000/login) con `admin@hemocentro.local` / `Admin123!`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Importar donantes HUAV
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run import:donors
+```
 
-## Learn More
+Usa el archivo `data/Info Donates 2026.xlsx`.
 
-To learn more about Next.js, take a look at the following resources:
+## Documentación completa
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Consulte **[docs/INSTALACION.md](docs/INSTALACION.md)** para:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Instalar en otro equipo
+- Acceder desde la red local cambiando la IP
+- Configurar OpenWA ([open-wa.org](https://www.open-wa.org/))
+- Configurar SMTP e imágenes en plantillas
+- Solución de problemas
 
-## Deploy on Vercel
+## Stack
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Next.js 16 · TypeScript · Tailwind v4 · Prisma · MySQL · OpenWA / WhatsApp Cloud API · Nodemailer
+# Hemocentro_Record
