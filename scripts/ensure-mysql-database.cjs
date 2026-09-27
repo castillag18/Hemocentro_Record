@@ -33,14 +33,20 @@ function parseMysqlUrl(url) {
 }
 
 function resolveDbConfig() {
+  const passwordFallback = process.env.HUAV_DB_PASSWORD || "";
   const fromUrl = parseMysqlUrl(process.env.DATABASE_URL);
-  if (fromUrl?.database) return fromUrl;
+  if (fromUrl?.database) {
+    return {
+      ...fromUrl,
+      password: fromUrl.password || passwordFallback,
+    };
+  }
 
   const host = process.env.HUAV_DB_HOST || "localhost";
   const port = Number(process.env.HUAV_DB_PORT || 3306);
   const database = process.env.HUAV_DB_NAME || "huav";
   const user = process.env.HUAV_DB_USER || "root";
-  const password = process.env.HUAV_DB_PASSWORD || "";
+  const password = passwordFallback;
 
   return { host, port, database, user, password };
 }
@@ -83,12 +89,21 @@ async function main() {
       console.log(`✓ Base de datos «${cfg.database}» creada`);
     }
 
-    await connection.changeUser({ database: cfg.database });
-    await connection.query("SELECT 1");
+    await connection.end();
+    connection = null;
+    const scoped = await mysql.createConnection({
+      host: cfg.host,
+      port: cfg.port,
+      user: cfg.user,
+      password: cfg.password,
+      database: cfg.database,
+    });
+    await scoped.query("SELECT 1");
+    await scoped.end();
     console.log(`✓ Conexión OK a «${cfg.database}»`);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    if (/access denied.*create/i.test(msg) || /privilege/i.test(msg)) {
+    if (/access denied/i.test(msg)) {
       console.warn(`⚠ Sin permiso CREATE DATABASE. Verifique que «${cfg.database}» exista en el servidor MySQL.`);
       try {
         const direct = await mysql.createConnection({ ...cfg, database: cfg.database });
@@ -101,7 +116,22 @@ async function main() {
         process.exit(1);
       }
     }
-    console.error("❌", msg);
+    if (/ECONNREFUSED|Can't reach database/i.test(msg)) {
+      console.error("❌ No se pudo conectar a MySQL en", `${cfg.host}:${cfg.port}`);
+      console.error("");
+      console.error("  Si la BD está en Windows Server (192.168.1.4) y la app en VM Linux:");
+      console.error("    HUAV_DB_HOST=\"192.168.1.4\"");
+      console.error("    DATABASE_URL=\"mysql://usuario:pass@192.168.1.4:3306/huav\"");
+      console.error("");
+      console.error("  Pruebe desde la VM:");
+      console.error(`    nc -zv ${cfg.host} ${cfg.port}`);
+      console.error(`    mysql -h ${cfg.host} -u ${cfg.user} -p ${cfg.database} -e "SELECT 1;"`);
+      console.error("");
+      console.error("  En Windows Server: MySQL escuchando en 0.0.0.0, firewall puerto 3306,");
+      console.error("  usuario MySQL con permiso desde la IP de la VM (192.168.1.112).");
+    } else {
+      console.error("❌", msg);
+    }
     process.exit(1);
   } finally {
     if (connection) await connection.end();

@@ -71,21 +71,26 @@ cp .env.example .env
 nano .env
 ```
 
-### Producción HUAV (MySQL existente `huav` en el mismo servidor)
+### Arquitectura HUAV — VM Linux + MySQL en Windows Server
 
-En el servidor use **`localhost`** como host de MySQL:
+| Equipo | IP | Rol |
+|---|---|---|
+| VM Linux | `192.168.1.112` | App Next.js + Docker (OpenWA) |
+| Windows Server | `192.168.1.4` | MySQL base de datos `huav` |
+
+**Importante:** En la VM **no use `localhost`** para MySQL. La BD está en el Windows Server.
 
 ```env
-HUAV_DB_HOST="localhost"
+HUAV_DB_HOST="192.168.1.4"
 HUAV_DB_PORT="3306"
 HUAV_DB_NAME="huav"
 HUAV_DB_USER="He_mo_center"
-HUAV_DB_PASSWORD="su-contraseña"
-DATABASE_URL="mysql://He_mo_center:su-contraseña@localhost:3306/huav"
+HUAV_DB_PASSWORD="H*3M0eNt3R"
+DATABASE_URL="mysql://He_mo_center:H%2A3M0eNt3R@192.168.1.4:3306/huav"
 
-NEXT_PUBLIC_APP_URL="http://192.168.1.4:3000"
+NEXT_PUBLIC_APP_URL="http://192.168.1.112:3000"
 NODE_ENV="production"
-GOOGLE_REDIRECT_URI="http://192.168.1.4:3000/api/auth/google/callback"
+GOOGLE_REDIRECT_URI="http://192.168.1.112:3000/api/auth/google/callback"
 
 WHATSAPP_OPENWA_API_KEY="owa_k1_..."
 OPENWA_WEBHOOK_SECRET="secreto-minimo-16-caracteres"
@@ -93,6 +98,35 @@ OPENWA_WEBHOOK_URL="http://172.17.0.1:3000/api/webhooks/openwa"
 ```
 
 > Codifique `*` en la contraseña como `%2A` dentro de `DATABASE_URL`.
+
+### MySQL en el mismo servidor Linux (solo si BD y app están juntas)
+
+Use `localhost` solo cuando MySQL corre **en la misma VM**:
+
+```env
+HUAV_DB_HOST="localhost"
+DATABASE_URL="mysql://He_mo_center:pass@localhost:3306/huav"
+```
+
+### Permitir conexión remota desde la VM (Windows Server)
+
+En el **Windows Server** (`192.168.1.4`):
+
+1. MySQL debe escuchar en todas las interfaces (`bind-address = 0.0.0.0` en `my.ini`).
+2. **Firewall Windows:** regla de entrada TCP **3306** desde `192.168.1.112`.
+3. Usuario MySQL con acceso remoto, por ejemplo:
+   ```sql
+   GRANT ALL ON huav.* TO 'He_mo_center'@'192.168.1.112' IDENTIFIED BY 'H*3M0eNt3R';
+   FLUSH PRIVILEGES;
+   ```
+   (O `'He_mo_center'@'%'` en la red interna.)
+
+Desde la **VM Linux**, verifique:
+
+```bash
+nc -zv 192.168.1.4 3306
+mysql -h 192.168.1.4 -u He_mo_center -p huav -e "SELECT 1;"
+```
 
 ### Pruebas con MySQL en Docker (sin BD huav)
 
@@ -138,7 +172,7 @@ npm run install:server
 ## 5. Acceder desde la red
 
 ```
-http://192.168.1.4:3000/login
+http://192.168.1.112:3000/login
 ```
 
 | Campo | Valor inicial |
@@ -188,7 +222,8 @@ pm2 startup
 
 | Problema | Solución |
 |---|---|
-| `Can't reach database server` | Verifique MySQL activo: `systemctl status mysql` o `docker ps` |
+| `ECONNREFUSED 127.0.0.1:3306` | BD no está en la VM: use `192.168.1.4` en `.env`, no `localhost` |
+| `Can't reach database server` | Desde VM: `nc -zv 192.168.1.4 3306` — firewall/MySQL remoto en Windows |
 | Sin permiso `CREATE DATABASE` | Normal en BD `huav` corporativa; la BD ya debe existir |
 | OpenWA: session not found | Configuración → nombre sesión `default` → Generar QR |
 | Webhook no llega | En Linux use `172.17.0.1` en `OPENWA_WEBHOOK_URL`, no `host.docker.internal` |
