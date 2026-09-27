@@ -251,7 +251,28 @@ npm run db:push:retry
 
 ---
 
-## 9. Solución de problemas
+## 9. Error 403 en `/_next/static/chunks` (modo desarrollo)
+
+Al abrir la app por IP (`http://192.168.1.112:3000`), Next.js 16 bloquea recursos dev por seguridad.
+
+**Solución:** `next.config.ts` incluye `allowedDevOrigins` con la IP de la VM. Tras actualizar el código:
+
+```bash
+# Reinicie el servidor dev (Ctrl+C y de nuevo)
+npm run dev:fresh
+```
+
+Si usa otra IP, agregue en `.env`:
+
+```env
+ALLOWED_DEV_ORIGINS="192.168.1.112"
+```
+
+En **producción** (`npm run build` + `npm run start`) este bloqueo no aplica.
+
+---
+
+## 10. Solución de problemas
 
 | Problema | Solución |
 |---|---|
