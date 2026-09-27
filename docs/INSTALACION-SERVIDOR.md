@@ -14,6 +14,26 @@ Guía para desplegar la aplicación en una **máquina virtual Linux** (por ejemp
 | Docker Compose | v2+ | `docker compose version` |
 | Git | Opcional | `git --version` |
 
+### Instalar Node.js 20 (Ubuntu / Debian)
+
+Si `./scripts/install-server.sh` muestra *«Instale Node.js 20+»*:
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+node -v    # debe mostrar v20.x.x
+npm -v
+```
+
+Alternativa con **nvm** (sin sudo para Node):
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+source ~/.bashrc
+nvm install 20
+nvm use 20
+```
+
 Puertos que deben estar libres o publicados:
 
 | Puerto | Servicio |
@@ -30,8 +50,8 @@ Desde su PC o directamente en la VM:
 
 ```bash
 # Opción A — Git
-git clone <URL-DEL-REPO> /opt/recordatorio_hemocentro
-cd /opt/recordatorio_hemocentro
+git clone https://github.com/castillag18/Hemocentro_Record.git
+cd /opt/Hemocentro_Record
 
 # Opción B — Copiar carpeta comprimida
 # scp, SFTP o carpeta compartida de la VM
@@ -42,7 +62,12 @@ cd /opt/recordatorio_hemocentro
 ## 3. Configurar variables de entorno
 
 ```bash
+# Si existe la plantilla del servidor:
 cp .env.server.example .env
+
+# Si no existe (repo antiguo en GitHub), use la general:
+cp .env.example .env
+
 nano .env
 ```
 

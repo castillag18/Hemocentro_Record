@@ -2,8 +2,15 @@
  * Crea la base de datos MySQL si no existe (según .env).
  * Uso: node scripts/ensure-mysql-database.cjs
  */
-const mysql = require("mysql2/promise");
 const { loadEnv } = require("./load-env.cjs");
+
+let mysql;
+try {
+  mysql = require("mysql2/promise");
+} catch {
+  console.error("❌ Falta el paquete mysql2. Ejecute primero: npm install");
+  process.exit(1);
+}
 
 loadEnv();
 

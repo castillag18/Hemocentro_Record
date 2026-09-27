@@ -51,10 +51,21 @@ echo " HUAV — Instalación en servidor Linux"
 echo "═══════════════════════════════════════════════════════════════"
 
 # --- Requisitos ---
-command -v node >/dev/null 2>&1 || fail "Instale Node.js 20+ (https://nodejs.org/)"
+if ! command -v node >/dev/null 2>&1; then
+  echo ""
+  echo "Node.js no está instalado. En Ubuntu/Debian ejecute:"
+  echo ""
+  echo "  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -"
+  echo "  sudo apt-get install -y nodejs"
+  echo "  node -v && npm -v"
+  echo ""
+  echo "Luego vuelva a ejecutar: ./scripts/install-server.sh"
+  echo ""
+  exit 1
+fi
 command -v npm >/dev/null 2>&1 || fail "npm no encontrado"
 NODE_MAJOR="$(node -p "process.version.slice(1).split('.')[0]")"
-[[ "$NODE_MAJOR" -ge 18 ]] || fail "Se requiere Node.js 18+ (detectado: $(node -v))"
+[[ "$NODE_MAJOR" -ge 18 ]] || fail "Se requiere Node.js 18+ (detectado: $(node -v)). Actualice con NodeSource 20.x (ver arriba)."
 
 if [[ "$USE_DOCKER_MYSQL" -eq 1 ]]; then
   command -v docker >/dev/null 2>&1 || fail "Docker no encontrado. Instálelo o omita --docker."
@@ -104,13 +115,13 @@ if [[ "$USE_DOCKER_MYSQL" -eq 1 ]]; then
   fi
 fi
 
+# --- Dependencias (antes de scripts que usan mysql2) ---
+log "Instalando dependencias npm..."
+npm install
+
 # --- Crear BD si no existe (Docker o externa según .env) ---
 log "Verificando / creando base de datos..."
 node scripts/ensure-mysql-database.cjs
-
-# --- Dependencias ---
-log "Instalando dependencias npm..."
-npm install
 
 # --- Esquema Prisma ---
 log "Sincronizando esquema y datos iniciales..."
