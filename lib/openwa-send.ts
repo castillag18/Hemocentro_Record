@@ -235,26 +235,6 @@ export async function sendOpenWaTextMessage(
       chatId,
       text: ctx.text,
     });
-    // #region agent log
-    fetch("http://127.0.0.1:7337/ingest/480d9457-0d84-4217-82dc-239d47e97655", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "dc40f8" },
-      body: JSON.stringify({
-        sessionId: "dc40f8",
-        runId: "post-baileys",
-        hypothesisId: "H4-send",
-        location: "openwa-send.ts:sendOpenWaTextMessage",
-        message: "Envío OpenWA completado",
-        data: {
-          chatId,
-          httpStatus: res.status,
-          deliveryStatus: delivered?.status ?? "unknown",
-          messageId: delivered?.id ?? data.messageId ?? null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     return {
       messageId: delivered?.id ?? data.messageId ?? "sent",
       chatId,

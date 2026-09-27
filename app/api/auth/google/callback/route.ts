@@ -74,27 +74,6 @@ export async function GET(request: Request) {
   if (!code || !state || !stateValid) {
     const scope = searchParams.get("scope") || "";
     const calendarScopeRequested = scope.includes("calendar");
-    // #region agent log
-    fetch("http://127.0.0.1:7337/ingest/480d9457-0d84-4217-82dc-239d47e97655", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "dc40f8" },
-      body: JSON.stringify({
-        sessionId: "dc40f8",
-        runId: "calendar-connect",
-        hypothesisId: "H6-oauth-state",
-        location: "auth/google/callback:invalid-state",
-        message: "OAuth state inválido",
-        data: {
-          hasCode: Boolean(code),
-          hasState: Boolean(state),
-          hadPending: Boolean(pending),
-          cookieMatch: Boolean(state && cookieState && state === cookieState),
-          calendarScopeRequested,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     if (code && (calendarScopeRequested || mode === "calendar")) {
       return NextResponse.redirect(
         `${baseUrl}/citas?oauth_code=${encodeURIComponent(code)}`,
@@ -118,26 +97,6 @@ export async function GET(request: Request) {
         );
       }
       const sync = await saveGoogleCalendarTokens({ ...googleUser, refreshToken });
-      // #region agent log
-      fetch("http://127.0.0.1:7337/ingest/480d9457-0d84-4217-82dc-239d47e97655", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "dc40f8" },
-        body: JSON.stringify({
-          sessionId: "dc40f8",
-          runId: "calendar-connect",
-          hypothesisId: "H5-calendar",
-          location: "auth/google/callback:calendar",
-          message: "Google Calendar tokens guardados",
-          data: {
-            email: googleUser.email,
-            hadNewRefreshToken: Boolean(googleUser.refreshToken),
-            usedExistingRefreshToken: !googleUser.refreshToken && Boolean(current.googleRefreshToken),
-            syncedAppointments: sync.synced,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       return NextResponse.redirect(`${baseUrl}/citas?google=connected&synced=${sync.synced}`);
     }
 
@@ -157,25 +116,6 @@ export async function GET(request: Request) {
     let sync = { synced: 0, failed: 0 };
     if (refreshToken) {
       sync = await saveGoogleCalendarTokens({ ...googleUser, refreshToken });
-      // #region agent log
-      fetch("http://127.0.0.1:7337/ingest/480d9457-0d84-4217-82dc-239d47e97655", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "dc40f8" },
-        body: JSON.stringify({
-          sessionId: "dc40f8",
-          runId: "calendar-connect",
-          hypothesisId: "H7-login-calendar",
-          location: "auth/google/callback:login",
-          message: "Calendar tokens guardados en login Google",
-          data: {
-            email: googleUser.email,
-            hadNewRefreshToken: Boolean(googleUser.refreshToken),
-            syncedAppointments: sync.synced,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
     }
 
     const token = await createSessionToken({ userId: admin.id, email: admin.email });

@@ -209,14 +209,8 @@ export default function ConfiguracionPage() {
     }
   }
 
-  async function persistSessionUuid(uuid: string) {
-    if (!form || form.whatsappOpenWaSessionId === uuid) return;
-    const next = { ...form, whatsappOpenWaSessionId: uuid };
-    const saved = await api<Settings>("/api/settings", {
-      method: "PUT",
-      body: JSON.stringify(next),
-    });
-    setForm(saved);
+  async function persistSessionUuid(_uuid: string) {
+    // El UUID de OpenWA es efímero; no sobrescribir el nombre de sesión en Settings.
   }
 
   if (!form) return <p className="text-secondary">Cargando configuración...</p>;

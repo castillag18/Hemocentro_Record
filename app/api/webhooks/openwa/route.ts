@@ -51,26 +51,6 @@ async function notifyDonorWhatsApp(
   });
   const chatId = (result as { chatId?: string }).chatId ?? options.chatId;
   await persistDonorWhatsAppChatId(options.donorId, chatId);
-  // #region agent log
-  fetch("http://127.0.0.1:7337/ingest/480d9457-0d84-4217-82dc-239d47e97655", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "dc40f8" },
-    body: JSON.stringify({
-      sessionId: "dc40f8",
-      runId: "webhook-post-fix",
-      hypothesisId: "H3-delivery",
-      location: "webhooks/openwa/route.ts:notifyDonorWhatsApp",
-      message: "WhatsApp enviado",
-      data: {
-        donorId: options.donorId,
-        chatId,
-        deliveryStatus: (result as { deliveryStatus?: string }).deliveryStatus ?? "unknown",
-        viaReply: Boolean((result as { viaReply?: boolean }).viaReply),
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
 }
 
 function openWaContext(settings: Awaited<ReturnType<typeof getSettings>>) {
@@ -132,27 +112,6 @@ async function confirmAppointment(options: {
       }),
     };
   }
-
-  // #region agent log
-  fetch("http://127.0.0.1:7337/ingest/480d9457-0d84-4217-82dc-239d47e97655", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "dc40f8" },
-    body: JSON.stringify({
-      sessionId: "dc40f8",
-      runId: "calendar-fix",
-      hypothesisId: "H5-calendar",
-      location: "webhooks/openwa/route.ts:confirmAppointment",
-      message: "Resultado Google Calendar",
-      data: {
-        configured: googleCalendarConfigured(options.settings),
-        googleEventId: appointment.googleEventId,
-        calendarError,
-        scheduledAt: appointment.scheduledAt.toISOString(),
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
 
   await prisma.appointment.create({
     data: {
@@ -416,22 +375,6 @@ async function handleOpenWaWebhook(request: Request) {
 
   const { from, body, messageId, fromMe, isGroup, event } = extractOpenWaWebhookMessage(payload);
 
-  // #region agent log
-  fetch("http://127.0.0.1:7337/ingest/480d9457-0d84-4217-82dc-239d47e97655", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "dc40f8" },
-    body: JSON.stringify({
-      sessionId: "dc40f8",
-      runId: "webhook-post-fix",
-      hypothesisId: "H1-lid",
-      location: "webhooks/openwa/route.ts:handleOpenWaWebhook",
-      message: "Webhook recibido",
-      data: { from, bodyPreview: body.slice(0, 40), messageId, event, fromMe, isGroup },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-
   if (fromMe || isGroup) {
     return NextResponse.json({ ignored: true, reason: "Mensaje propio o de grupo" });
   }
@@ -446,21 +389,6 @@ async function handleOpenWaWebhook(request: Request) {
 
   const donor = await findDonorByOpenWaContact(from, openWaContext(settings));
   if (!donor || !donor.phone) {
-    // #region agent log
-    fetch("http://127.0.0.1:7337/ingest/480d9457-0d84-4217-82dc-239d47e97655", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "dc40f8" },
-      body: JSON.stringify({
-        sessionId: "dc40f8",
-        runId: "webhook-post-fix",
-        hypothesisId: "H1-lid",
-        location: "webhooks/openwa/route.ts:donor-not-found",
-        message: "Donante no encontrado",
-        data: { from },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     return NextResponse.json({ ignored: true, reason: "Donante no encontrado" });
   }
 
@@ -474,28 +402,6 @@ async function handleOpenWaWebhook(request: Request) {
     if (openWaMessageId) replyToMessageId = openWaMessageId;
   }
   const activeSession = await getActiveBookingSession(donor.id);
-
-  // #region agent log
-  fetch("http://127.0.0.1:7337/ingest/480d9457-0d84-4217-82dc-239d47e97655", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "dc40f8" },
-    body: JSON.stringify({
-      sessionId: "dc40f8",
-      runId: "webhook-post-fix",
-      hypothesisId: "H2-flow",
-      location: "webhooks/openwa/route.ts:donor-found",
-      message: "Donante identificado",
-      data: {
-        donorId: donor.id,
-        donorName: donor.name,
-        replyChatId,
-        hasActiveSession: Boolean(activeSession),
-        isAffirmative: isAffirmativeReply(body),
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
 
   if (activeSession) {
     const slots = deserializeSlots(activeSession.slotsJson);

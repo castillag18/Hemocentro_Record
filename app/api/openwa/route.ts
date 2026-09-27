@@ -83,6 +83,9 @@ function friendlyOpenWaError(message: string) {
   if (/already authenticated/i.test(message)) {
     return "WhatsApp ya está vinculado en esta sesión. No necesita escanear otro QR.";
   }
+  if (/session with id.*not found/i.test(message)) {
+    return "La sesión OpenWA expiró (reinicio del servicio). Pulse «Generar código QR» de nuevo; se creará una sesión nueva automáticamente.";
+  }
   if (/ECONNREFUSED|fetch failed/i.test(message)) {
     return "No se pudo conectar con OpenWA. Verifique que el servicio esté activo en la URL configurada.";
   }

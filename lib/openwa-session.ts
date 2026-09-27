@@ -40,15 +40,31 @@ export async function listOpenWaSessions(options: { baseUrl: string; apiKey: str
   return Array.isArray(data) ? data : [];
 }
 
+async function openWaSessionExists(
+  options: { baseUrl: string; apiKey: string },
+  uuid: string,
+) {
+  const base = options.baseUrl.replace(/\/$/, "");
+  const res = await fetch(`${base}/api/sessions/${encodeURIComponent(uuid)}`, {
+    headers: openWaHeaders(options.apiKey),
+  });
+  return res.ok;
+}
+
 export async function resolveOpenWaSessionUuid(options: {
   baseUrl: string;
   apiKey: string;
   sessionId: string;
 }) {
   const raw = options.sessionId?.trim() || "default";
-  if (isOpenWaSessionUuid(raw)) return raw;
+  if (isOpenWaSessionUuid(raw)) {
+    const exists = await openWaSessionExists(options, raw);
+    if (exists) return raw;
+  }
 
-  const name = normalizeOpenWaSessionName(raw);
+  const name = normalizeOpenWaSessionName(
+    isOpenWaSessionUuid(raw) ? "default" : raw,
+  );
   const sessions = await listOpenWaSessions(options);
   const existing = sessions.find((s) => s.name === name);
   if (existing?.id) return existing.id;

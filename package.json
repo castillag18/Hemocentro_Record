@@ -8,6 +8,9 @@
     "build": "prisma generate && next build",
     "start": "next start --hostname 0.0.0.0",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:google-calendar": "vitest run lib/google-calendar.integration.test.ts",
     "db:check": "node scripts/check-db.cjs",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
@@ -24,6 +27,8 @@
     "google:calendar-url": "node scripts/print-google-calendar-url.cjs",
     "google:test-calendar": "node scripts/test-google-calendar.cjs",
     "install:local": "node scripts/install-local.cjs",
+    "install:server": "bash scripts/install-server.sh",
+    "db:ensure": "node scripts/ensure-mysql-database.cjs",
     "local:setup": "node scripts/local-setup.cjs",
     "playwright:install": "playwright install chromium",
     "postinstall": "prisma generate"
@@ -62,6 +67,7 @@
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
     "tsx": "^4.23.12",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2.1.9"
   }
 }

@@ -1,4 +1,5 @@
 import type { Settings } from "@prisma/client";
+import { isOpenWaSessionUuid } from "./openwa-session";
 import { prisma } from "./prisma";
 
 const DEFAULT_OPENWA_SESSION = "default";
@@ -12,7 +13,11 @@ export function resolveOpenWaApiKey(stored?: string | null) {
 }
 
 export function resolveOpenWaSessionId(stored?: string | null) {
-  return stored?.trim() || process.env.WHATSAPP_OPENWA_SESSION_ID?.trim() || DEFAULT_OPENWA_SESSION;
+  const value =
+    stored?.trim() || process.env.WHATSAPP_OPENWA_SESSION_ID?.trim() || DEFAULT_OPENWA_SESSION;
+  // UUIDs son efímeros (cambian al reiniciar OpenWA); usar siempre el nombre de sesión.
+  if (isOpenWaSessionUuid(value)) return DEFAULT_OPENWA_SESSION;
+  return value;
 }
 
 export function resolveOpenWaWebhookSecret(stored?: string | null) {

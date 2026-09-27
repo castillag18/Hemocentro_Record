@@ -94,16 +94,33 @@ curl http://localhost:3000/api/health
 
 ## 3. Instalación en servidor del cliente (producción)
 
-### 3.1 Preparar el servidor
+> **Guía detallada VM Linux + Docker:** [INSTALACION-SERVIDOR.md](./INSTALACION-SERVIDOR.md)
+
+### 3.1 Instalación automática (recomendado — Linux)
 
 ```bash
-# Clonar o copiar el proyecto al servidor
+git clone <URL-DEL-REPOSITORIO> /opt/recordatorio_hemocentro
+cd /opt/recordatorio_hemocentro
+
+cp .env.server.example .env
+nano .env   # credenciales HUAV, OpenWA, Google
+
+chmod +x scripts/install-server.sh
+./scripts/install-server.sh          # MySQL externo (huav)
+# ./scripts/install-server.sh --docker   # MySQL en Docker (pruebas)
+```
+
+El script crea la BD si no existe, sincroniza tablas, compila e inicia la app en el puerto 3000.
+
+### 3.1b Preparar el servidor (manual)
+
+```bash
 git clone <URL-DEL-REPOSITORIO> /opt/recordatorio_hemocentro
 cd /opt/recordatorio_hemocentro
 
 npm install
-cp .env.example .env
-nano .env   # o el editor de su preferencia
+cp .env.server.example .env
+nano .env
 ```
 
 ### 3.2 Configurar `.env` para producción
@@ -623,6 +640,9 @@ http://192.168.1.50:3000
 |---|---|
 | `npm install` | Instalar dependencias |
 | `npm run install:local` | Instalación completa: .env + Docker MySQL + tablas + seed |
+| `./scripts/install-server.sh` | Instalación en servidor Linux: BD + build + start |
+| `npm run install:server` | Alias del script anterior |
+| `npm run db:ensure` | Crear base de datos MySQL si no existe |
 | `npm run local:setup` | Alias de `install:local` |
 | `npm run dev` | Modo desarrollo |
 | `npm run dev:fresh` | Verifica BD, libera puerto 3000 e inicia dev |
