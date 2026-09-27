@@ -121,12 +121,14 @@ npm install
 
 # --- Crear BD si no existe (Docker o externa según .env) ---
 log "Verificando / creando base de datos..."
-node scripts/ensure-mysql-database.cjs
+if ! node scripts/ensure-mysql-database.cjs; then
+  echo "⚠ ensure-mysql-database falló; continuando si check-db responde..."
+fi
 
-# --- Esquema Prisma ---
+# --- Esquema Prisma (reintentos para MySQL remoto) ---
 log "Sincronizando esquema y datos iniciales..."
+node scripts/db-push-retry.cjs
 npx prisma generate
-npx prisma db push --accept-data-loss
 npx tsx prisma/seed.ts
 
 log "Verificando conexión..."
@@ -134,8 +136,15 @@ node scripts/check-db.cjs
 
 # --- Build producción ---
 if [[ "$START_MODE" == "production" ]]; then
-  log "Compilando aplicación..."
-  npm run build
+  log "Compilando aplicación (memoria extendida para VMs pequeñas)..."
+  export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=4096}"
+  npm run build || {
+    echo ""
+    echo "⚠ build de producción falló (memoria insuficiente)."
+    echo "  Opción A: agregue swap en la VM y reintente: npm run build:server"
+    echo "  Opción B: use modo desarrollo: ./scripts/install-server.sh --dev --no-start && npm run dev:fresh"
+    exit 1
+  }
 fi
 
 # --- Variables útiles ---

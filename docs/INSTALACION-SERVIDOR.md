@@ -218,7 +218,40 @@ pm2 startup
 
 ---
 
-## 8. Solución de problemas
+## 8. VM con poca RAM (error heap out of memory)
+
+Si `npm run build` falla con `JavaScript heap out of memory`:
+
+```bash
+# Opción A — más memoria para Node
+export NODE_OPTIONS=--max-old-space-size=4096
+npm run build:server
+
+# Opción B — swap temporal (2 GB)
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+npm run build:server
+
+# Opción C — pruebas sin build de producción
+npm run db:push:retry
+npm run db:seed
+npm run dev:fresh
+```
+
+`dev:fresh` no requiere `next build` y sirve para validar la app en el servidor.
+
+### MySQL remoto intermitente (P1001)
+
+```bash
+nc -zv 192.168.1.4 3306
+npm run db:push:retry
+```
+
+---
+
+## 9. Solución de problemas
 
 | Problema | Solución |
 |---|---|
