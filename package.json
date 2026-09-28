@@ -15,7 +15,7 @@
     "db:check": "node scripts/check-db.cjs",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
-    "db:push": "prisma db push",
+    "db:push": "node scripts/guard-app-database.cjs && prisma db push",
     "db:push:retry": "node scripts/db-push-retry.cjs",
     "db:sync": "prisma db push --accept-data-loss && node scripts/free-port-3000.cjs && prisma generate",
     "db:seed": "tsx prisma/seed.ts",

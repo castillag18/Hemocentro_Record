@@ -2,6 +2,8 @@
 
 Plataforma administrativa para **HUAV Banco de Sangre**: gestión de donantes, importación desde Excel, recordatorios periódicos por WhatsApp y correo.
 
+> **Bases de datos separadas:** `DATABASE_URL` → `hemocentro_app` (esta app). `HUAV_DB_*` → `huav` (sistema corporativo, solo lectura). **Nunca** ejecute `prisma db push` sobre `huav`. Recuperación: [docs/RECUPERACION-BD-HUAV.md](docs/RECUPERACION-BD-HUAV.md).
+
 ## Inicio rápido (desarrollo Windows)
 
 ```bash

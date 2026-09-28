@@ -44,7 +44,7 @@ function resolveDbConfig() {
 
   const host = process.env.HUAV_DB_HOST || "localhost";
   const port = Number(process.env.HUAV_DB_PORT || 3306);
-  const database = process.env.HUAV_DB_NAME || "huav";
+  const database = process.env.APP_DB_NAME || "hemocentro_app";
   const user = process.env.HUAV_DB_USER || "root";
   const password = passwordFallback;
 

@@ -6,7 +6,15 @@ const { loadEnv } = require("./load-env.cjs");
 
 loadEnv();
 
-const args = ["db", "push", "--accept-data-loss", ...process.argv.slice(2)];
+const guard = spawnSync("node", ["scripts/guard-app-database.cjs"], {
+  stdio: "inherit",
+  cwd: require("node:path").join(__dirname, ".."),
+});
+if (guard.status !== 0) process.exit(guard.status ?? 1);
+
+const acceptLoss = process.argv.includes("--accept-data-loss");
+const extraArgs = process.argv.slice(2).filter((a) => a !== "--accept-data-loss");
+const args = ["db", "push", ...(acceptLoss ? ["--accept-data-loss"] : []), ...extraArgs];
 const maxAttempts = Number(process.env.DB_PUSH_RETRIES || 5);
 const delayMs = Number(process.env.DB_PUSH_RETRY_DELAY_MS || 4000);
 

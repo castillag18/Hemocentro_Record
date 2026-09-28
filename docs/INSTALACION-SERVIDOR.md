@@ -80,13 +80,16 @@ nano .env
 
 **Importante:** En la VM **no use `localhost`** para MySQL. La BD está en el Windows Server.
 
+> ⚠ **NUNCA** use la base corporativa `huav` en `DATABASE_URL`. Prisma (`db push`) puede **borrar tablas del sistema HUAV**. Use una base separada `hemocentro_app`. Ver [RECUPERACION-BD-HUAV.md](./RECUPERACION-BD-HUAV.md) si ya ocurrió el daño.
+
 ```env
 HUAV_DB_HOST="192.168.1.4"
 HUAV_DB_PORT="3306"
 HUAV_DB_NAME="huav"
 HUAV_DB_USER="He_mo_center"
 HUAV_DB_PASSWORD="H*3M0eNt3R"
-DATABASE_URL="mysql://He_mo_center:H%2A3M0eNt3R@192.168.1.4:3306/huav"
+APP_DB_NAME="hemocentro_app"
+DATABASE_URL="mysql://He_mo_center:H%2A3M0eNt3R@192.168.1.4:3306/hemocentro_app"
 
 NEXT_PUBLIC_APP_URL="http://192.168.1.112:3000"
 NODE_ENV="production"
