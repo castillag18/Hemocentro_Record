@@ -22,6 +22,10 @@ type OpenWaStatusResponse = {
   sessionName?: string;
   phone?: string | null;
   pushName?: string | null;
+  webhookUrl?: string;
+  webhookRegistered?: boolean;
+  webhookWarning?: string;
+  inboxPoll?: { processed?: number; skipped?: number };
 };
 
 export function OpenWaQrPanel({
@@ -47,6 +51,9 @@ export function OpenWaQrPanel({
   const [testMessage, setTestMessage] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [webhookRegistered, setWebhookRegistered] = useState<boolean | null>(null);
+  const [registeringWebhook, setRegisteringWebhook] = useState(false);
 
   const payload = useMemo(
     () => ({
@@ -79,7 +86,13 @@ export function OpenWaQrPanel({
       setSentToday(data.sentToday);
       setLimit(data.limit);
       applySessionUuid(data.sessionUuid);
-      setError("");
+      if (data.webhookUrl) setWebhookUrl(data.webhookUrl);
+      if (data.webhookRegistered != null) setWebhookRegistered(data.webhookRegistered);
+      if (data.webhookWarning) {
+        setError(data.webhookWarning);
+      } else {
+        setError("");
+      }
 
       if (data.status.toLowerCase() === "qr_ready" && !qrSrc) {
         const qrData = await api<{
@@ -203,6 +216,27 @@ export function OpenWaQrPanel({
     }
   }
 
+  async function registerWebhook() {
+    setRegisteringWebhook(true);
+    setError("");
+    setNotice("");
+    try {
+      await runWithSave(async () => {
+        const data = await api<{ ok: boolean; message: string; webhookUrl?: string }>("/api/openwa", {
+          method: "POST",
+          body: JSON.stringify({ action: "register-webhook", ...payload }),
+        });
+        setWebhookRegistered(data.ok);
+        if (data.webhookUrl) setWebhookUrl(data.webhookUrl);
+        setNotice(data.message);
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo registrar el webhook");
+    } finally {
+      setRegisteringWebhook(false);
+    }
+  }
+
   async function sendTestMessage() {
     if (!testPhone.trim()) {
       setError("Indique un número de teléfono para enviar la prueba");
@@ -261,6 +295,37 @@ export function OpenWaQrPanel({
         {needsQr ? " · Abra WhatsApp en su teléfono → Dispositivos vinculados → Escanear código." : ""}
         {isReady ? " · Puede enviar recordatorios y mensajes de prueba." : ""}
       </p>
+
+      {isReady ? (
+        <div className="rounded-lg border border-outline-variant bg-surface-container-lowest p-3 space-y-2">
+          <p className="text-body-sm font-medium text-on-surface">Respuestas de donantes (agendamiento)</p>
+          <p className="text-body-xs text-secondary">
+            Al responder «Sí», la app consulta la bandeja de OpenWA cada 15 s (mientras esta página esté abierta)
+            y también vía webhook si está registrado.
+          </p>
+          {webhookUrl ? (
+            <p className="text-body-xs font-mono text-secondary break-all">URL: {webhookUrl}</p>
+          ) : null}
+          <div className="flex flex-wrap gap-2 items-center">
+            <Button
+              variant="outline"
+              onClick={() => void registerWebhook()}
+              disabled={loading || testing || sendingTest || registeringWebhook}
+            >
+              {registeringWebhook ? "Registrando..." : "Registrar webhook"}
+            </Button>
+            <span
+              className={`text-body-xs ${webhookRegistered ? "text-tertiary-container" : "text-error"}`}
+            >
+              {webhookRegistered === true
+                ? "Webhook activo"
+                : webhookRegistered === false
+                  ? "Webhook no registrado"
+                  : "Estado desconocido"}
+            </span>
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap gap-md items-start">
         <Button onClick={() => void generateQr()} disabled={loading || testing || sendingTest}>

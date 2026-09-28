@@ -70,7 +70,9 @@ export async function middleware(request: NextRequest) {
   if (isPublicApi) return NextResponse.next();
 
   const isPublicWebhook =
-    pathname === "/api/webhooks/openwa" || pathname === "/api/cron/reminders";
+    pathname === "/api/webhooks/openwa" ||
+    pathname === "/api/cron/reminders" ||
+    pathname === "/api/cron/openwa-inbox";
   if (isPublicWebhook) return NextResponse.next();
 
   if (isLogin) {

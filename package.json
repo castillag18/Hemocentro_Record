@@ -24,6 +24,7 @@
     "import:donors:huav": "node scripts/import-donors-huav.cjs",
     "cron:reminders": "node scripts/run-cron.cjs",
     "openwa:register-webhook": "node scripts/register-openwa-webhook.cjs",
+    "openwa:poll-inbox": "node scripts/run-openwa-inbox-poll.cjs",
     "openwa:restart-session": "node scripts/restart-openwa-session.cjs",
     "google:connect-calendar": "node scripts/connect-google-calendar.cjs",
     "google:calendar-url": "node scripts/print-google-calendar-url.cjs",

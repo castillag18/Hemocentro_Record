@@ -12,54 +12,29 @@ import { Spinner } from "@/components/Spinner";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [email, setEmail] = useState("admin@hemocentro.local");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  const [oauthPaste, setOauthPaste] = useState("");
-  const [oauthConnecting, setOauthConnecting] = useState(false);
   const autoConnectAttempted = useRef(false);
 
   const googleError = searchParams.get("error");
 
   useEffect(() => {
     if (googleError !== "google_not_configured") return;
-    void api<{ redirectUri: string; javascriptOrigin: string }>("/api/auth/google/status").then(
-      (status) => {
-        void alertInfo(
-          "Google OAuth no configurado",
-          `Inicie sesión con correo y contraseña. El administrador del sistema debe definir GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en el archivo .env del servidor.\n\nEn Google Cloud use:\n• Origen JS: ${status.javascriptOrigin}\n• URI redirect: ${status.redirectUri}`,
-        );
-      },
+    void alertInfo(
+      "Google OAuth no configurado",
+      "Inicie sesión con correo y contraseña o contacte al administrador del sistema.",
     );
   }, [googleError]);
 
-  async function loginWithGoogle() {
-    void alertInfo(
-      "Después de autorizar en Google",
-      "Si el navegador muestra localhost con error de conexión, copie la URL completa de la barra y péguela abajo en «Completar inicio de sesión con URL copiada».",
-    );
-    window.setTimeout(() => {
-      window.location.href = "/api/auth/google?mode=login";
-    }, 800);
-  }
-
-  async function completeGoogleLoginPaste(codeInput?: string) {
-    const code = (codeInput ?? oauthPaste).trim();
-    if (!code) {
-      void alertInfo("Pegue la URL", "Copie la URL completa después de autorizar en Google.");
-      return;
-    }
-    setOauthConnecting(true);
+  async function completeGoogleLogin(code: string) {
     showLoading("Completando inicio de sesión con Google...");
     try {
-      await api<{ email: string; calendarConnected: boolean; synced: number }>(
-        "/api/auth/google/complete",
-        {
-          method: "POST",
-          body: JSON.stringify({ code }),
-        },
-      );
+      await api<{ email: string }>("/api/auth/google/complete", {
+        method: "POST",
+        body: JSON.stringify({ code }),
+      });
       closeLoading();
       await alertSuccess("Bienvenido", "Sesión iniciada con Google correctamente");
       router.replace("/");
@@ -67,8 +42,6 @@ function LoginForm() {
     } catch (err) {
       closeLoading();
       void alertError("Error", err instanceof Error ? err.message : "No se pudo completar el inicio de sesión");
-    } finally {
-      setOauthConnecting(false);
     }
   }
 
@@ -77,8 +50,7 @@ function LoginForm() {
     if (!autoCode || autoConnectAttempted.current) return;
     autoConnectAttempted.current = true;
     window.history.replaceState({}, "", "/login");
-    setOauthPaste(autoCode);
-    void completeGoogleLoginPaste(autoCode);
+    void completeGoogleLogin(autoCode);
   }, [searchParams]);
 
   async function onSubmit(e: React.FormEvent) {
@@ -118,25 +90,22 @@ function LoginForm() {
 
   function googleErrorMessage() {
     if (googleError === "google_test_user") {
-      return "Google bloqueó el acceso: agregue su correo en Google Cloud → Pantalla de consentimiento OAuth → Usuarios de prueba.";
+      return "Google bloqueó el acceso. Contacte al administrador del sistema.";
     }
     if (googleError === "google_not_authorized") {
-      const email = searchParams.get("email");
-      return email
-        ? `El correo ${email} no está registrado. Un administrador debe crear su usuario en Usuarios con ese mismo correo.`
-        : "Su cuenta de Google no está autorizada. Cree un usuario con ese correo en Usuarios.";
+      return "Su cuenta de Google no está autorizada. Solicite acceso al administrador.";
     }
     if (googleError === "google_no_refresh") {
-      return "Google no entregó permisos de Calendar. Revoque el acceso en myaccount.google.com/permissions e intente Conectar de nuevo.";
+      return "No se pudieron obtener permisos de Google Calendar. Contacte al administrador.";
     }
     if (googleError === "google_denied") return "Acceso con Google cancelado.";
     if (googleError === "google_not_configured") {
-      return "Google OAuth no está configurado en el servidor (.env). Contacte al administrador del sistema.";
+      return "Inicio de sesión con Google no disponible. Use correo y contraseña.";
     }
     if (googleError === "google_invalid") return "Sesión OAuth inválida. Intente de nuevo.";
-    if (googleError === "google_failed") return "Error al conectar con Google. Verifique credenciales y URIs.";
+    if (googleError === "google_failed") return "Error al conectar con Google. Intente más tarde.";
     if (googleError === "database_unavailable") {
-      return "Base de datos no disponible. Inicie Docker Desktop, ejecute npm run install:local y reinicie la app.";
+      return "Servicio temporalmente no disponible. Intente más tarde.";
     }
     if (googleError) return "No se pudo iniciar sesión con Google.";
     return null;
@@ -167,6 +136,7 @@ function LoginForm() {
             <input
               type="email"
               maxLength={254}
+              autoComplete="username"
               className="mt-1 w-full border border-secondary-container rounded-lg p-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -178,6 +148,7 @@ function LoginForm() {
             <input
               type="password"
               maxLength={128}
+              autoComplete="current-password"
               className="mt-1 w-full border border-secondary-container rounded-lg p-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -199,46 +170,13 @@ function LoginForm() {
         <Button
           variant="outline"
           className="w-full"
-          onClick={() => void loginWithGoogle()}
+          onClick={() => {
+            window.location.href = "/api/auth/google?mode=login";
+          }}
           disabled={loading}
         >
           <Icon name="account_circle" /> Continuar con Google
         </Button>
-        <p className="text-xs text-secondary mt-2">
-          Si Calendar no está conectado, Google pedirá permiso de calendario al iniciar sesión (cuenta
-          registrada en Usuarios).
-        </p>
-
-        <div className="mt-4 rounded-lg border border-outline-variant bg-surface-container-low p-3 space-y-2">
-          <p className="text-xs font-semibold text-secondary uppercase tracking-wider">
-            Completar inicio de sesión con URL copiada
-          </p>
-          <p className="text-xs text-secondary">
-            Si Google redirige a <span className="font-mono">localhost</span> y no vuelve a la app, copie la URL
-            completa (contiene <span className="font-mono">code=</span>) y péguela aquí.
-          </p>
-          <textarea
-            className="w-full border border-secondary-container rounded-lg p-2 text-xs font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary min-h-[4rem]"
-            placeholder="http://localhost:3000/api/auth/google/callback?code=..."
-            value={oauthPaste}
-            onChange={(e) => setOauthPaste(e.target.value)}
-            disabled={oauthConnecting || loading}
-          />
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => void completeGoogleLoginPaste()}
-            disabled={oauthConnecting || loading || !oauthPaste.trim()}
-          >
-            {oauthConnecting ? <Spinner size="sm" /> : <Icon name="link" />}
-            {oauthConnecting ? "Completando..." : "Completar inicio de sesión"}
-          </Button>
-        </div>
-
-        <p className="text-xs text-secondary mt-5">
-          Acceso inicial: <span className="font-mono">admin@hemocentro.local</span> /{" "}
-          <span className="font-mono">Admin123!</span>
-        </p>
       </div>
     </div>
   );

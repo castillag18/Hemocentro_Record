@@ -143,3 +143,11 @@ model WhatsAppBookingSession {
   @@index([donorId, status])
   @@index([phone, status])
 }
+
+model OpenWaProcessedMessage {
+  messageId   String   @id
+  source      String   @default("webhook")
+  processedAt DateTime @default(now())
+
+  @@index([processedAt])
+}

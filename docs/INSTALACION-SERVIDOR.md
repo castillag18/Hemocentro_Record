@@ -201,6 +201,9 @@ npm run import:donors:huav
 # Registrar webhook WhatsApp (respuestas Sí / agendamiento)
 npm run openwa:register-webhook
 
+# Respaldo si el webhook no llega (Docker/LAN): consulta bandeja OpenWA cada minuto
+# crontab -e → * * * * * cd /ruta/proyecto && npm run openwa:poll-inbox >> /var/log/openwa-poll.log 2>&1
+
 # Verificar OpenWA
 curl http://localhost:2785/api/health
 ```

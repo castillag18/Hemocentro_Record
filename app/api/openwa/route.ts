@@ -16,6 +16,7 @@ import {
   startOpenWaSession,
   testOpenWaConnection,
 } from "@/lib/openwa";
+import { pollOpenWaInbox } from "@/lib/openwa-inbox-poll";
 
 type OpenWaBody = {
   action?: string;
@@ -208,10 +209,13 @@ export async function POST(request: Request) {
       const sentToday = await import("@/lib/whatsapp-limit").then((m) => m.getWhatsappSentTodayCount());
       let webhookRegistered: boolean | undefined;
       let webhookWarning: string | undefined;
+      const webhookUrl = resolveOpenWaWebhookUrl();
+      let inboxPoll = { processed: 0, skipped: 0 };
       if (status.status.toLowerCase() === "ready") {
         const webhook = await ensureWebhookRegistered(status.sessionUuid);
         webhookRegistered = webhook.webhookRegistered;
         webhookWarning = webhook.webhookWarning;
+        inboxPoll = await pollOpenWaInbox(settings);
       }
       return NextResponse.json({
         status: status.status,
@@ -221,8 +225,30 @@ export async function POST(request: Request) {
         sessionName: status.sessionName,
         sentToday,
         limit,
+        webhookUrl,
         webhookRegistered,
         webhookWarning,
+        inboxPoll,
+      });
+    }
+
+    if (body.action === "poll-inbox") {
+      const poll = await pollOpenWaInbox(settings);
+      return NextResponse.json({ ok: true, ...poll });
+    }
+
+    if (body.action === "register-webhook") {
+      const status = await getOpenWaSessionStatus(opts);
+      if (status.status.toLowerCase() !== "ready") {
+        return jsonError("WhatsApp debe estar en estado «ready» antes de registrar el webhook.");
+      }
+      const webhook = await ensureWebhookRegistered(status.sessionUuid);
+      return NextResponse.json({
+        ok: webhook.webhookRegistered,
+        webhookUrl: resolveOpenWaWebhookUrl(),
+        message: webhook.webhookRegistered
+          ? "Webhook registrado. Las respuestas «Sí» activarán el agendamiento."
+          : webhook.webhookWarning ?? "No se pudo registrar el webhook",
       });
     }
 

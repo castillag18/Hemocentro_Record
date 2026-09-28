@@ -10,8 +10,11 @@ function resolveOpenWaWebhookUrl() {
   const openWaOnLocalHost =
     openWaUrl.includes("localhost:2785") || openWaUrl.includes("127.0.0.1:2785");
 
-  if (openWaOnLocalHost && (process.platform === "win32" || process.platform === "darwin")) {
-    return `http://host.docker.internal:${port}${path}`;
+  if (openWaOnLocalHost) {
+    if (process.platform === "win32" || process.platform === "darwin") {
+      return `http://host.docker.internal:${port}${path}`;
+    }
+    return `http://172.17.0.1:${port}${path}`;
   }
 
   const base = (process.env.NEXT_PUBLIC_APP_URL || `http://localhost:${port}`).replace(/\/$/, "");

@@ -35,9 +35,12 @@ export function resolveOpenWaWebhookUrl() {
   const openWaOnLocalHost =
     openWaUrl.includes("localhost:2785") || openWaUrl.includes("127.0.0.1:2785");
 
-  // OpenWA en Docker no alcanza localhost:3000 del host (Windows/macOS).
-  if (openWaOnLocalHost && (process.platform === "win32" || process.platform === "darwin")) {
-    return `http://host.docker.internal:${port}${path}`;
+  if (openWaOnLocalHost) {
+    if (process.platform === "win32" || process.platform === "darwin") {
+      return `http://host.docker.internal:${port}${path}`;
+    }
+    // Linux + Docker: puente docker0 hacia la app en el host (0.0.0.0:3000)
+    return `http://172.17.0.1:${port}${path}`;
   }
 
   const base = (process.env.NEXT_PUBLIC_APP_URL || `http://localhost:${port}`).replace(/\/$/, "");
