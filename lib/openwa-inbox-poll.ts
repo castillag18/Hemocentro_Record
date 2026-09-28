@@ -1,6 +1,5 @@
 import { fetchWithTimeout } from "./fetch-timeout";
 import { prisma } from "./prisma";
-import { agentDebugLog } from "./debug-log";
 import { resolveOpenWaContactPhone } from "./openwa-contacts";
 import { openWaHeaders, resolveOpenWaSessionUuid } from "./openwa-session";
 import { processOpenWaInboundMessage } from "./openwa-inbound";
@@ -107,13 +106,6 @@ export async function pollOpenWaInbox(settingsInput?: Awaited<ReturnType<typeof 
 
   try {
     const messages = await fetchRecentIncomingMessages(settings);
-    agentDebugLog({
-      location: "openwa:poll",
-      message: "Inbox poll fetched messages",
-      data: { incomingCount: messages.length },
-      hypothesisId: "H14",
-      runId: "post-fix",
-    });
 
     for (const message of messages) {
       const messageId = message.id!;
@@ -154,20 +146,6 @@ export async function pollOpenWaInbox(settingsInput?: Awaited<ReturnType<typeof 
         continue;
       }
 
-      agentDebugLog({
-        location: "openwa:poll",
-        message: "Message processed",
-        data: {
-          messageId,
-          chatSuffix: from.slice(-15),
-          bodyPreview: body.slice(0, 30),
-          senderPhone: senderPhone ? `***${senderPhone.slice(-4)}` : null,
-          result,
-        },
-        hypothesisId: "H15",
-        runId: "post-fix",
-      });
-
       if (shouldMarkMessageProcessed(result as Record<string, unknown>)) {
         await markMessageProcessed(messageId, "poll");
         processed += 1;
@@ -191,13 +169,6 @@ export async function pollOpenWaInbox(settingsInput?: Awaited<ReturnType<typeof 
     };
   } catch (err) {
     const error = err instanceof Error ? err.message : "Error al consultar bandeja OpenWA";
-    agentDebugLog({
-      location: "openwa:poll",
-      message: "Inbox poll failed",
-      data: { error },
-      hypothesisId: "H14",
-      runId: "post-fix",
-    });
     return { processed, skipped, error };
   }
 }

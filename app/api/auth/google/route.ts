@@ -3,14 +3,12 @@ import { cookies } from "next/headers";
 import { isDatabaseUnavailable } from "@/lib/db-errors";
 import {
   getGoogleAuthUrl,
-  getGoogleRedirectUri,
   googleCalendarConfigured,
   googleOAuthConfigured,
 } from "@/lib/google-oauth";
 import { createOAuthState } from "@/lib/google-oauth-state";
 import { getSettings } from "@/lib/settings";
 import { usesSecureCookies } from "@/lib/cookie-secure";
-import { agentDebugLog } from "@/lib/debug-log";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 const STATE_COOKIE = "google_oauth_state";
@@ -47,14 +45,6 @@ export async function GET(request: Request) {
 
   const jar = await cookies();
   const cookieSecure = usesSecureCookies();
-  // #region agent log
-  agentDebugLog({
-    location: "google/route:GET",
-    message: "OAuth redirect start",
-    data: { mode, cookieSecure, redirectUri: getGoogleRedirectUri() },
-    hypothesisId: "H6",
-  });
-  // #endregion
   jar.set(STATE_COOKIE, state, {
     httpOnly: true,
     sameSite: "lax",

@@ -49,32 +49,12 @@ async function handleOpenWaWebhook(request: Request) {
   const signature = request.headers.get("x-openwa-signature");
   const legacySecret = request.headers.get("x-webhook-secret");
   const headerEvent = request.headers.get("x-openwa-event");
-  // #region agent log
-  const { agentDebugLog: logEntry } = await import("@/lib/debug-log");
-  logEntry({
-    location: "openwa:webhook:entry",
-    message: "Webhook POST received",
-    data: {
-      hasSignature: Boolean(signature),
-      headerEvent: headerEvent ?? null,
-      bodyBytes: rawBody.length,
-    },
-    hypothesisId: "H11",
-    runId: "post-fix",
-  });
-  // #endregion
 
   const authorized =
     verifyOpenWaWebhookSignature(rawBody, signature, webhookSecret) ||
     Boolean(legacySecret && legacySecret === webhookSecret);
 
   if (!authorized) {
-    logEntry({
-      location: "openwa:webhook",
-      message: "Webhook unauthorized",
-      data: { hasSignature: Boolean(signature), hasLegacySecret: Boolean(legacySecret) },
-      hypothesisId: "H9",
-    });
     return NextResponse.json({ error: "Webhook no autorizado" }, { status: 401 });
   }
 

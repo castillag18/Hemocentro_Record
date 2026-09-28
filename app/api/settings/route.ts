@@ -2,24 +2,12 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { handlePrismaRouteError, jsonError, withAdminAuth } from "@/lib/api";
 import { getSettings, openWaEnvConfigured, publicSettings } from "@/lib/settings";
-import { agentDebugLog } from "@/lib/debug-log";
 
 export async function GET() {
-  const t0 = Date.now();
   const { error } = await withAdminAuth();
-  const tAuth = Date.now();
   if (error) return error;
   try {
     const settings = await getSettings();
-    const tDone = Date.now();
-    // #region agent log
-    agentDebugLog({
-      hypothesisId: "PERF-A",
-      location: "app/api/settings/route.ts:GET",
-      message: "settings_timing",
-      data: { authMs: tAuth - t0, settingsMs: tDone - tAuth, totalMs: tDone - t0 },
-    });
-    // #endregion
     return NextResponse.json(publicSettings(settings));
   } catch (err) {
     return handlePrismaRouteError(err);

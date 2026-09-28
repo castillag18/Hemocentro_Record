@@ -9,7 +9,6 @@ import { consumeOAuthState } from "@/lib/google-oauth-state";
 import { getSettings } from "@/lib/settings";
 import { isDatabaseUnavailable } from "@/lib/db-errors";
 import { usesSecureCookies } from "@/lib/cookie-secure";
-import { agentDebugLog } from "@/lib/debug-log";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 const STATE_COOKIE = "google_oauth_state";
@@ -60,21 +59,6 @@ export async function GET(request: Request) {
     (cookieMode === "calendar" ? "calendar" : "login");
   const stateValid =
     Boolean(pending) || Boolean(state && cookieState && state === cookieState);
-  // #region agent log
-  agentDebugLog({
-    location: "google/callback:GET",
-    message: "OAuth callback state check",
-    data: {
-      mode,
-      stateValid,
-      hasCode: Boolean(code),
-      hasCookieState: Boolean(cookieState),
-      cookieSecure: usesSecureCookies(),
-      error: error ?? null,
-    },
-    hypothesisId: "H6",
-  });
-  // #endregion
   const errorTarget =
     mode === "calendar" ? `${baseUrl}/configuracion?tab=canales` : `${baseUrl}/login`;
 
@@ -119,19 +103,6 @@ export async function GET(request: Request) {
         );
       }
       const sync = await saveGoogleCalendarTokens({ ...googleUser, refreshToken });
-      // #region agent log
-      agentDebugLog({
-        location: "google/callback:calendar",
-        message: "OAuth calendar connected",
-        data: {
-          email: googleUser.email,
-          hasRefreshToken: Boolean(refreshToken),
-          synced: sync.synced,
-          failed: sync.failed,
-        },
-        hypothesisId: "H3",
-      });
-      // #endregion
       return NextResponse.redirect(
         `${baseUrl}/configuracion?google=connected&synced=${sync.synced}`,
       );
@@ -169,18 +140,6 @@ export async function GET(request: Request) {
       : `${baseUrl}/?google=login_ok&calendar=pending`;
     return NextResponse.redirect(loginTarget);
   } catch (error) {
-    // #region agent log
-    agentDebugLog({
-      location: "google/callback:error",
-      message: "OAuth callback failed",
-      data: {
-        mode,
-        errorType: error instanceof Error ? error.name : "unknown",
-        errorMessage: error instanceof Error ? error.message : String(error),
-      },
-      hypothesisId: "H2",
-    });
-    // #endregion
     if (isDatabaseUnavailable(error)) {
       return NextResponse.redirect(appendQuery(errorTarget, "error", "database_unavailable"));
     }

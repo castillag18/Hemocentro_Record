@@ -206,16 +206,6 @@ async function handleAffirmativeReply(options: {
   }
 
   const slots = await generateAvailableSlots();
-  // #region agent log
-  const { agentDebugLog } = await import("./debug-log");
-  agentDebugLog({
-    location: "openwa:handleAffirmativeReply",
-    message: "Generated slots for donor",
-    data: { donorId: options.donor.id, slotCount: slots.length },
-    hypothesisId: "H8",
-    runId: "post-fix",
-  });
-  // #endregion
 
   if (!slots.length) {
     if (options.donor.phone) {
@@ -256,14 +246,6 @@ async function handleAffirmativeReply(options: {
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error al enviar fechas por WhatsApp";
-    const { agentDebugLog: logSendFail } = await import("./debug-log");
-    logSendFail({
-      location: "openwa:handleAffirmativeReply",
-      message: "Failed to send slot options",
-      data: { donorId: options.donor.id, error: msg },
-      hypothesisId: "H13",
-      runId: "post-fix",
-    });
     return {
       ok: true,
       step: "awaiting_slot_selection",
@@ -343,22 +325,6 @@ export async function processOpenWaInboundMessage(
 
   const waCtx = openWaContext(settings);
   const donor = await findDonorByOpenWaContact(from, waCtx, { senderPhone });
-  // #region agent log
-  const { agentDebugLog } = await import("./debug-log");
-  agentDebugLog({
-    location: "openwa:inbound",
-    message: "Processing inbound WhatsApp message",
-    data: {
-      source,
-      fromSuffix: from.slice(-12),
-      bodyPreview: body.slice(0, 40),
-      donorFound: Boolean(donor),
-      isAffirmative: isAffirmativeReply(body),
-    },
-    hypothesisId: "H7",
-    runId: "post-fix",
-  });
-  // #endregion
 
   if (!donor || !donor.phone) {
     const phoneHint = senderPhone || from.replace(/@c\.us$/i, "").replace(/\D/g, "");

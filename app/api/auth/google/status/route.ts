@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { usesSecureCookies } from "@/lib/cookie-secure";
-import { agentDebugLog } from "@/lib/debug-log";
 import {
   detectGoogleOAuthDeployment,
   isGoogleAllowedOAuthUrl,
@@ -31,13 +30,5 @@ export async function GET() {
       ? redirectUri.startsWith(appUrl.replace(/\/$/, ""))
       : null,
   };
-  // #region agent log
-  agentDebugLog({
-    location: "google/status",
-    message: "OAuth status check",
-    data: payload,
-    hypothesisId: "H1",
-  });
-  // #endregion
   return NextResponse.json(payload);
 }

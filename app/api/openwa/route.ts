@@ -19,7 +19,6 @@ import {
 } from "@/lib/openwa";
 import { fetchWithTimeout } from "@/lib/fetch-timeout";
 import { pollOpenWaInbox } from "@/lib/openwa-inbox-poll";
-import { agentDebugLog } from "@/lib/debug-log";
 
 type OpenWaBody = {
   action?: string;
@@ -210,18 +209,9 @@ export async function POST(request: Request) {
     }
 
     if (body.action === "status") {
-      const t0 = Date.now();
       const status = await getOpenWaSessionStatus(opts);
       const sentToday = await import("@/lib/whatsapp-limit").then((m) => m.getWhatsappSentTodayCount());
       const webhookUrl = resolveOpenWaWebhookUrl();
-      // #region agent log
-      agentDebugLog({
-        hypothesisId: "PERF-C",
-        location: "app/api/openwa/route.ts:status",
-        message: "openwa_status_timing",
-        data: { totalMs: Date.now() - t0, openWaStatus: status.status },
-      });
-      // #endregion
       return NextResponse.json({
         status: status.status,
         phone: status.phone,
@@ -236,16 +226,7 @@ export async function POST(request: Request) {
     }
 
     if (body.action === "poll-inbox") {
-      const t0 = Date.now();
       const poll = await pollOpenWaInbox(settings);
-      // #region agent log
-      agentDebugLog({
-        hypothesisId: "PERF-D",
-        location: "app/api/openwa/route.ts:poll-inbox",
-        message: "openwa_poll_timing",
-        data: { totalMs: Date.now() - t0, processed: poll.processed, skipped: poll.skipped },
-      });
-      // #endregion
       return NextResponse.json({ ok: true, ...poll });
     }
 

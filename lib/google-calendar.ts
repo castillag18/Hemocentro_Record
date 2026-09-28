@@ -3,7 +3,6 @@ import type { Settings } from "@prisma/client";
 import { formatDate } from "./dates";
 import { nextAppointmentSlot } from "./reminders";
 import { getCalendarAuth, googleCalendarConfigured } from "./google-oauth";
-import { agentDebugLog } from "./debug-log";
 import { prisma } from "./prisma";
 
 export { googleCalendarConfigured };
@@ -66,19 +65,6 @@ export async function createDonorAppointment(options: {
   scheduledAt?: Date;
 }) {
   const calendarReady = googleCalendarConfigured(options.settings);
-  // #region agent log
-  agentDebugLog({
-    location: "google-calendar:createDonorAppointment",
-    message: "Create calendar event attempt",
-    data: {
-      calendarReady,
-      calendarId: options.settings.googleCalendarId || "primary",
-      hasRefreshToken: Boolean(options.settings.googleRefreshToken),
-      hasServiceAccount: Boolean(options.settings.googleCredentialsJson),
-    },
-    hypothesisId: "H4",
-  });
-  // #endregion
   if (!calendarReady) {
     throw new Error("Google Calendar no está configurado");
   }
@@ -148,14 +134,6 @@ export async function createDonorAppointment(options: {
       minute: "2-digit",
     }),
   };
-  // #region agent log
-  agentDebugLog({
-    location: "google-calendar:createDonorAppointment",
-    message: "Calendar event created",
-    data: { googleEventId: result.googleEventId },
-    hypothesisId: "H5",
-  });
-  // #endregion
   return result;
 }
 
