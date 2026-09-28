@@ -93,7 +93,12 @@ export async function GET(request: Request) {
     const calendarScopeRequested = scope.includes("calendar");
     if (code && (calendarScopeRequested || mode === "calendar")) {
       return NextResponse.redirect(
-        `${baseUrl}/citas?oauth_code=${encodeURIComponent(code)}`,
+        `${baseUrl}/configuracion?tab=canales&oauth_code=${encodeURIComponent(code)}`,
+      );
+    }
+    if (code && mode === "login") {
+      return NextResponse.redirect(
+        `${baseUrl}/login?oauth_code=${encodeURIComponent(code)}`,
       );
     }
     return NextResponse.redirect(appendQuery(errorTarget, "error", "google_invalid"));

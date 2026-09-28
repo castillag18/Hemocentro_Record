@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/client";
 import { loginSchema } from "@/lib/validation/schemas";
@@ -16,6 +16,9 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [oauthPaste, setOauthPaste] = useState("");
+  const [oauthConnecting, setOauthConnecting] = useState(false);
+  const autoConnectAttempted = useRef(false);
 
   const googleError = searchParams.get("error");
 
@@ -32,8 +35,51 @@ function LoginForm() {
   }, [googleError]);
 
   async function loginWithGoogle() {
-    window.location.href = "/api/auth/google?mode=login";
+    void alertInfo(
+      "Después de autorizar en Google",
+      "Si el navegador muestra localhost con error de conexión, copie la URL completa de la barra y péguela abajo en «Completar inicio de sesión con URL copiada».",
+    );
+    window.setTimeout(() => {
+      window.location.href = "/api/auth/google?mode=login";
+    }, 800);
   }
+
+  async function completeGoogleLoginPaste(codeInput?: string) {
+    const code = (codeInput ?? oauthPaste).trim();
+    if (!code) {
+      void alertInfo("Pegue la URL", "Copie la URL completa después de autorizar en Google.");
+      return;
+    }
+    setOauthConnecting(true);
+    showLoading("Completando inicio de sesión con Google...");
+    try {
+      await api<{ email: string; calendarConnected: boolean; synced: number }>(
+        "/api/auth/google/complete",
+        {
+          method: "POST",
+          body: JSON.stringify({ code }),
+        },
+      );
+      closeLoading();
+      await alertSuccess("Bienvenido", "Sesión iniciada con Google correctamente");
+      router.replace("/");
+      router.refresh();
+    } catch (err) {
+      closeLoading();
+      void alertError("Error", err instanceof Error ? err.message : "No se pudo completar el inicio de sesión");
+    } finally {
+      setOauthConnecting(false);
+    }
+  }
+
+  useEffect(() => {
+    const autoCode = searchParams.get("oauth_code");
+    if (!autoCode || autoConnectAttempted.current) return;
+    autoConnectAttempted.current = true;
+    window.history.replaceState({}, "", "/login");
+    setOauthPaste(autoCode);
+    void completeGoogleLoginPaste(autoCode);
+  }, [searchParams]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -162,6 +208,32 @@ function LoginForm() {
           Si Calendar no está conectado, Google pedirá permiso de calendario al iniciar sesión (cuenta
           registrada en Usuarios).
         </p>
+
+        <div className="mt-4 rounded-lg border border-outline-variant bg-surface-container-low p-3 space-y-2">
+          <p className="text-xs font-semibold text-secondary uppercase tracking-wider">
+            Completar inicio de sesión con URL copiada
+          </p>
+          <p className="text-xs text-secondary">
+            Si Google redirige a <span className="font-mono">localhost</span> y no vuelve a la app, copie la URL
+            completa (contiene <span className="font-mono">code=</span>) y péguela aquí.
+          </p>
+          <textarea
+            className="w-full border border-secondary-container rounded-lg p-2 text-xs font-mono outline-none focus:border-primary focus:ring-1 focus:ring-primary min-h-[4rem]"
+            placeholder="http://localhost:3000/api/auth/google/callback?code=..."
+            value={oauthPaste}
+            onChange={(e) => setOauthPaste(e.target.value)}
+            disabled={oauthConnecting || loading}
+          />
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => void completeGoogleLoginPaste()}
+            disabled={oauthConnecting || loading || !oauthPaste.trim()}
+          >
+            {oauthConnecting ? <Spinner size="sm" /> : <Icon name="link" />}
+            {oauthConnecting ? "Completando..." : "Completar inicio de sesión"}
+          </Button>
+        </div>
 
         <p className="text-xs text-secondary mt-5">
           Acceso inicial: <span className="font-mono">admin@hemocentro.local</span> /{" "}

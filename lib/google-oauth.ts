@@ -1,12 +1,17 @@
 import { google } from "googleapis";
 import type { Settings } from "@prisma/client";
+import { isGoogleAllowedOAuthUrl } from "./google-oauth-url";
+
 const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
+const LOCALHOST_CALLBACK = "http://localhost:3000/api/auth/google/callback";
 
 export function getGoogleRedirectUri() {
-  return (
-    process.env.GOOGLE_REDIRECT_URI ??
-    `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api/auth/google/callback`
-  );
+  const explicit = process.env.GOOGLE_REDIRECT_URI?.trim();
+  const derived = `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api/auth/google/callback`;
+  const candidate = explicit || derived;
+  if (isGoogleAllowedOAuthUrl(candidate)) return candidate;
+  // Google no acepta IPs LAN (192.168.x.x); usar localhost + flujo pegar URL.
+  return LOCALHOST_CALLBACK;
 }
 
 export function getGoogleJavascriptOrigin() {

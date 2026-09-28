@@ -44,9 +44,32 @@ export async function resolveOpenWaContactPhone(
   return digits || null;
 }
 
+function phoneDigitsMatch(storedPhone: string | null, phoneDigits: string) {
+  const normalized = normalizePhone(storedPhone);
+  if (!normalized || !phoneDigits) return false;
+  return (
+    normalized === phoneDigits ||
+    normalized.endsWith(phoneDigits.slice(-10)) ||
+    phoneDigits.endsWith(normalized.slice(-10))
+  );
+}
+
+async function matchDonorByPhoneDigits(phoneDigits: string, acceptedOnly: boolean) {
+  if (!phoneDigits) return null;
+  const donors = await prisma.donor.findMany({
+    where: {
+      active: true,
+      ...(acceptedOnly ? { accepted: true } : {}),
+      phone: { not: null },
+    },
+  });
+  return donors.find((item) => phoneDigitsMatch(item.phone, phoneDigits)) ?? null;
+}
+
 export async function findDonorByOpenWaContact(
   from: string,
   ctx?: OpenWaContext,
+  options?: { senderPhone?: string | null },
 ) {
   const chatId = from.trim();
   if (!chatId) return null;
@@ -56,28 +79,23 @@ export async function findDonorByOpenWaContact(
   });
   if (byChatId) return byChatId;
 
-  let phoneDigits = chatId.replace(/@c\.us$/i, "").replace(/\D/g, "");
-
-  if (chatId.endsWith("@lid") && ctx) {
-    const resolved = await resolveOpenWaContactPhone(ctx, chatId);
-    if (resolved) phoneDigits = resolved;
+  let phoneDigits = "";
+  if (/@c\.us$/i.test(chatId)) {
+    phoneDigits = chatId.replace(/@c\.us$/i, "").replace(/\D/g, "");
+  } else if (chatId.endsWith("@lid")) {
+    const hinted = String(options?.senderPhone ?? "").replace(/\D/g, "");
+    if (hinted.length >= 10) phoneDigits = hinted;
+    if (!phoneDigits && ctx) {
+      const resolved = await resolveOpenWaContactPhone(ctx, chatId);
+      if (resolved) phoneDigits = resolved;
+    }
+  } else {
+    phoneDigits = chatId.replace(/\D/g, "");
   }
 
   if (!phoneDigits) return null;
 
-  const donors = await prisma.donor.findMany({
-    where: { active: true, accepted: true, phone: { not: null } },
-  });
-
-  const donor =
-    donors.find((item) => {
-      const normalized = normalizePhone(item.phone);
-      return (
-        normalized === phoneDigits ||
-        normalized?.endsWith(phoneDigits.slice(-10)) ||
-        phoneDigits.endsWith((normalized ?? "").slice(-10))
-      );
-    }) ?? null;
+  const donor = await matchDonorByPhoneDigits(phoneDigits, true);
 
   if (donor && chatId.includes("@") && donor.whatsappChatId !== chatId) {
     await prisma.donor
@@ -89,6 +107,15 @@ export async function findDonorByOpenWaContact(
   }
 
   return donor;
+}
+
+/** Para diagnóstico: donante activo pero no aceptado (no recibe agendamiento). */
+export async function findInactiveAcceptedDonorByPhone(phoneDigits: string) {
+  if (!phoneDigits) return null;
+  const donors = await prisma.donor.findMany({
+    where: { active: true, accepted: false, phone: { not: null } },
+  });
+  return donors.find((item) => phoneDigitsMatch(item.phone, phoneDigits)) ?? null;
 }
 
 export async function persistDonorWhatsAppChatId(donorId: string, chatId: string | undefined) {

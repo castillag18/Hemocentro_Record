@@ -44,11 +44,15 @@ export type OpenWaWebhookPayload = {
     from?: string;
     body?: string;
     text?: string;
+    senderPhone?: string | number | null;
     fromMe?: boolean;
     isGroup?: boolean;
     type?: string;
     chatId?: string;
+    contact?: { id?: string; number?: string; name?: string; pushName?: string };
     message?: { id?: string; body?: string; text?: string };
+    selectedButtonId?: string;
+    selectedRowId?: string;
   };
   from?: string;
   body?: string;
@@ -56,15 +60,34 @@ export type OpenWaWebhookPayload = {
   messageId?: string;
 };
 
-export function extractOpenWaWebhookMessage(payload: OpenWaWebhookPayload) {
-  const from = payload.data?.from ?? payload.data?.chatId ?? payload.from ?? "";
-  const body =
-    payload.data?.body ??
-    payload.data?.text ??
-    payload.data?.message?.body ??
-    payload.data?.message?.text ??
+function pickTextBody(payload: OpenWaWebhookPayload) {
+  const data = payload.data;
+  const direct =
+    data?.body ??
+    data?.text ??
+    data?.message?.body ??
+    data?.message?.text ??
     payload.body ??
     "";
+  if (String(direct).trim()) return String(direct);
+  if (data?.selectedButtonId) return String(data.selectedButtonId);
+  if (data?.selectedRowId) return String(data.selectedRowId);
+  return "";
+}
+
+function pickSenderPhone(payload: OpenWaWebhookPayload) {
+  for (const raw of [payload.data?.senderPhone, payload.data?.contact?.number]) {
+    if (raw == null) continue;
+    const digits = String(raw).replace(/\D/g, "");
+    if (digits.length >= 10) return digits;
+  }
+  return "";
+}
+
+export function extractOpenWaWebhookMessage(payload: OpenWaWebhookPayload) {
+  const chatId = payload.data?.chatId ?? "";
+  const from = payload.data?.from ?? chatId ?? payload.from ?? "";
+  const body = pickTextBody(payload);
   const messageId =
     payload.data?.id ??
     payload.data?.messageId ??
@@ -75,8 +98,10 @@ export function extractOpenWaWebhookMessage(payload: OpenWaWebhookPayload) {
     "";
   return {
     from: String(from),
-    body: String(body),
+    chatId: String(chatId || from),
+    body,
     messageId: String(messageId),
+    senderPhone: pickSenderPhone(payload),
     fromMe: Boolean(payload.data?.fromMe),
     isGroup: Boolean(payload.data?.isGroup),
     event: payload.event ?? "",

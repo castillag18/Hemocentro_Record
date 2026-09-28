@@ -11,7 +11,10 @@ type DebugPayload = {
   timestamp?: number;
 };
 
-const LOG_PATH = path.join(process.cwd(), "debug-dc40f8.log");
+const LOG_PATHS = [
+  path.join(process.cwd(), "debug-dc40f8.log"),
+  path.join(process.cwd(), ".cursor", "debug-dc40f8.log"),
+];
 const INGEST_URL = "http://127.0.0.1:7337/ingest/480d9457-0d84-4217-82dc-239d47e97655";
 const SESSION_ID = "dc40f8";
 
@@ -22,10 +25,13 @@ export function agentDebugLog(payload: DebugPayload) {
     ...payload,
   });
 
-  try {
-    fs.appendFileSync(LOG_PATH, `${line}\n`, "utf8");
-  } catch {
-    /* ignore fs errors on read-only fs */
+  for (const logPath of LOG_PATHS) {
+    try {
+      fs.mkdirSync(path.dirname(logPath), { recursive: true });
+      fs.appendFileSync(logPath, `${line}\n`, "utf8");
+    } catch {
+      /* ignore fs errors on read-only fs */
+    }
   }
 
   fetch(INGEST_URL, {

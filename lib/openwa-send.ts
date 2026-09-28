@@ -196,6 +196,7 @@ export async function sendOpenWaReplyMessage(
 }
 
 function resolveOutboundChatId(options: { to: string; chatId?: string }) {
+  if (options.chatId?.endsWith("@lid")) return options.chatId;
   const normalizedPhone = normalizePhone(options.to);
   if (normalizedPhone) return `${normalizedPhone}@c.us`;
   if (options.chatId?.includes("@")) return options.chatId;
@@ -220,6 +221,17 @@ export async function sendOpenWaTextMessage(
   });
   const chatId = resolveOutboundChatId({ to: ctx.to, chatId: ctx.chatId });
   const base = ctx.baseUrl.replace(/\/$/, "");
+
+  if (ctx.replyToMessageId && ctx.chatId) {
+    return sendOpenWaReplyMessage({
+      baseUrl: ctx.baseUrl,
+      apiKey: ctx.apiKey,
+      sessionId: ctx.sessionId,
+      chatId,
+      quotedMessageId: ctx.replyToMessageId,
+      text: ctx.text,
+    });
+  }
 
   const res = await fetch(`${base}/api/sessions/${encodeURIComponent(sessionUuid)}/messages/send-text`, {
     method: "POST",

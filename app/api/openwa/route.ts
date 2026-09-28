@@ -206,6 +206,13 @@ export async function POST(request: Request) {
     if (body.action === "status") {
       const status = await getOpenWaSessionStatus(opts);
       const sentToday = await import("@/lib/whatsapp-limit").then((m) => m.getWhatsappSentTodayCount());
+      let webhookRegistered: boolean | undefined;
+      let webhookWarning: string | undefined;
+      if (status.status.toLowerCase() === "ready") {
+        const webhook = await ensureWebhookRegistered(status.sessionUuid);
+        webhookRegistered = webhook.webhookRegistered;
+        webhookWarning = webhook.webhookWarning;
+      }
       return NextResponse.json({
         status: status.status,
         phone: status.phone,
@@ -214,6 +221,8 @@ export async function POST(request: Request) {
         sessionName: status.sessionName,
         sentToday,
         limit,
+        webhookRegistered,
+        webhookWarning,
       });
     }
 

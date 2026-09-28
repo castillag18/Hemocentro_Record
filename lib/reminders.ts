@@ -19,6 +19,7 @@ export function isAffirmativeReply(text: string): boolean {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
   if (!normalized) return false;
+  if (normalized === "si" || normalized === "s" || normalized === "yes") return true;
   const patterns = [
     /^si\b/,
     /^yes\b/,
@@ -32,6 +33,8 @@ export function isAffirmativeReply(text: string): boolean {
     /^por supuesto\b/,
     /^de acuerdo\b/,
     /^listo\b/,
+    /^bueno\b/,
+    /^vale\b/,
   ];
   return patterns.some((pattern) => pattern.test(normalized));
 }

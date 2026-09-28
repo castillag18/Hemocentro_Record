@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/client";
 import { alertError, alertSuccess, alertInfo, showLoading, closeLoading } from "@/lib/alerts";
 import { Button } from "@/components/Button";
@@ -61,6 +61,7 @@ export default function ConfiguracionPage() {
   const [saving, setSaving] = useState(false);
   const [oauthPaste, setOauthPaste] = useState("");
   const [oauthConnecting, setOauthConnecting] = useState(false);
+  const autoOauthAttempted = useRef(false);
 
   useEffect(() => {
     void api<Settings>("/api/settings")
@@ -83,8 +84,57 @@ export default function ConfiguracionPage() {
       });
   }, []);
 
+  async function completeGoogleOAuthPaste(codeInput?: string) {
+    const paste = (codeInput ?? oauthPaste).trim();
+    if (!paste) {
+      void alertInfo("Pegue la URL", "Copie la URL completa de la barra del navegador después de autorizar en Google.");
+      return;
+    }
+    setOauthConnecting(true);
+    showLoading("Completando conexión con Google Calendar...");
+    try {
+      const result = await api<{ email: string; synced: number; failed: number }>(
+        "/api/google-calendar/connect",
+        {
+          method: "POST",
+          body: JSON.stringify({ code: paste }),
+        },
+      );
+      setOauthPaste("");
+      const loaded = await api<Settings>("/api/settings");
+      setForm({
+        ...loaded,
+        whatsappMode: loaded.whatsappMode === "wame" ? "openwa" : loaded.whatsappMode,
+        femaleWholeBloodMonths: loaded.femaleWholeBloodMonths ?? 4,
+        femaleApheresisMonths: loaded.femaleApheresisMonths ?? 1,
+        maleWholeBloodMonths: loaded.maleWholeBloodMonths ?? 3,
+        maleApheresisMonths: loaded.maleApheresisMonths ?? 1,
+      });
+      closeLoading();
+      void alertSuccess(
+        "Google Calendar conectado",
+        `${result.email} vinculado. ${result.synced} cita(s) sincronizada(s).`,
+      );
+    } catch (err) {
+      closeLoading();
+      void alertError("Error", err instanceof Error ? err.message : "No se pudo completar la conexión");
+    } finally {
+      setOauthConnecting(false);
+    }
+  }
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get("tab");
+    if (tabParam === "canales") setTab("canales");
+    const autoCode = params.get("oauth_code");
+    if (autoCode && !autoOauthAttempted.current) {
+      autoOauthAttempted.current = true;
+      setTab("canales");
+      setOauthPaste(autoCode);
+      window.history.replaceState({}, "", "/configuracion?tab=canales");
+      void completeGoogleOAuthPaste(autoCode);
+    }
     if (params.get("google") === "connected") {
       void api<Settings>("/api/settings").then((loaded) => {
         setForm({
@@ -184,42 +234,6 @@ export default function ConfiguracionPage() {
     }
   }
 
-  async function completeGoogleOAuthPaste() {
-    if (!oauthPaste.trim()) {
-      void alertInfo("Pegue la URL", "Copie la URL completa de la barra del navegador después de autorizar en Google.");
-      return;
-    }
-    setOauthConnecting(true);
-    showLoading("Completando conexión con Google Calendar...");
-    try {
-      const result = await api<{ email: string; synced: number; failed: number }>(
-        "/api/google-calendar/connect",
-        {
-          method: "POST",
-          body: JSON.stringify({ code: oauthPaste.trim() }),
-        },
-      );
-      setOauthPaste("");
-      const loaded = await api<Settings>("/api/settings");
-      setForm({
-        ...loaded,
-        whatsappMode: loaded.whatsappMode === "wame" ? "openwa" : loaded.whatsappMode,
-        femaleWholeBloodMonths: loaded.femaleWholeBloodMonths ?? 4,
-        femaleApheresisMonths: loaded.femaleApheresisMonths ?? 1,
-        maleWholeBloodMonths: loaded.maleWholeBloodMonths ?? 3,
-        maleApheresisMonths: loaded.maleApheresisMonths ?? 1,
-      });
-      void alertSuccess(
-        "Google Calendar conectado",
-        `${result.email} vinculado. ${result.synced} cita(s) sincronizada(s).`,
-      );
-    } catch (err) {
-      void alertError("Error", err instanceof Error ? err.message : "No se pudo completar la conexión");
-    } finally {
-      setOauthConnecting(false);
-      closeLoading();
-    }
-  }
 
   async function syncGoogleCalendar() {
     showLoading("Sincronizando citas con Google Calendar...");

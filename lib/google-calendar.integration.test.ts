@@ -315,10 +315,13 @@ describe("mensajes de confirmación de cita", () => {
 });
 
 describe("getGoogleRedirectUri", () => {
-  it("usa GOOGLE_REDIRECT_URI cuando está definida", () => {
+  it("usa GOOGLE_REDIRECT_URI cuando Google la acepta", () => {
+    process.env.GOOGLE_REDIRECT_URI = "http://localhost:3000/api/auth/google/callback";
+    expect(getGoogleRedirectUri()).toBe("http://localhost:3000/api/auth/google/callback");
+  });
+
+  it("cae a localhost cuando GOOGLE_REDIRECT_URI es IP privada", () => {
     process.env.GOOGLE_REDIRECT_URI = "http://192.168.1.4:3000/api/auth/google/callback";
-    expect(getGoogleRedirectUri()).toBe(
-      "http://192.168.1.4:3000/api/auth/google/callback",
-    );
+    expect(getGoogleRedirectUri()).toBe("http://localhost:3000/api/auth/google/callback");
   });
 });

@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSettings, resolveOpenWaWebhookSecret } from "@/lib/settings";
-import { findDonorByOpenWaContact, persistDonorWhatsAppChatId } from "@/lib/openwa-contacts";
+import {
+  findDonorByOpenWaContact,
+  findInactiveAcceptedDonorByPhone,
+  persistDonorWhatsAppChatId,
+} from "@/lib/openwa-contacts";
 import { resolveLatestIncomingMessageId } from "@/lib/openwa-send";
 import { openWaConfigured, sendOpenWaMessage } from "@/lib/whatsapp";
 import { isAffirmativeReply } from "@/lib/reminders";
@@ -38,7 +42,9 @@ async function notifyDonorWhatsApp(
     replyToMessageId?: string;
   },
 ) {
-  if (!openWaConfigured(settings)) return;
+  if (!openWaConfigured(settings)) {
+    throw new Error("WhatsApp (OpenWA) no está configurado");
+  }
   const apiKey = settings.whatsappOpenWaApiKey || process.env.WHATSAPP_OPENWA_API_KEY || "";
   const result = await sendOpenWaMessage({
     baseUrl: settings.whatsappOpenWaUrl,
@@ -300,6 +306,15 @@ async function handleAffirmativeReply(options: {
   }
 
   const slots = await generateAvailableSlots();
+  // #region agent log
+  const { agentDebugLog: logAffirmative } = await import("@/lib/debug-log");
+  logAffirmative({
+    location: "openwa:handleAffirmativeReply",
+    message: "Generated slots for donor",
+    data: { donorId: options.donor.id, slotCount: slots.length },
+    hypothesisId: "H8",
+  });
+  // #endregion
   if (!slots.length) {
     if (options.donor.phone) {
       await notifyDonorWhatsApp(options.settings, {
@@ -339,6 +354,15 @@ async function handleAffirmativeReply(options: {
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error al enviar fechas por WhatsApp";
+    // #region agent log
+    logAffirmative({
+      location: "openwa:handleAffirmativeReply",
+      message: "Failed to send slot options",
+      data: { donorId: options.donor.id, error: msg },
+      hypothesisId: "H13",
+      runId: "post-fix",
+    });
+    // #endregion
     return NextResponse.json({
       ok: true,
       step: "awaiting_slot_selection",
@@ -380,11 +404,35 @@ async function handleOpenWaWebhook(request: Request) {
   const rawBody = await request.text();
   const signature = request.headers.get("x-openwa-signature");
   const legacySecret = request.headers.get("x-webhook-secret");
+  const headerEvent = request.headers.get("x-openwa-event");
+  // #region agent log
+  const { agentDebugLog: logEntry } = await import("@/lib/debug-log");
+  logEntry({
+    location: "openwa:webhook:entry",
+    message: "Webhook POST received",
+    data: {
+      hasSignature: Boolean(signature),
+      headerEvent: headerEvent ?? null,
+      bodyBytes: rawBody.length,
+    },
+    hypothesisId: "H11",
+    runId: "post-fix",
+  });
+  // #endregion
   const authorized =
     verifyOpenWaWebhookSignature(rawBody, signature, webhookSecret) ||
     Boolean(legacySecret && legacySecret === webhookSecret);
 
   if (!authorized) {
+    // #region agent log
+    const { agentDebugLog: logAuth } = await import("@/lib/debug-log");
+    logAuth({
+      location: "openwa:webhook",
+      message: "Webhook unauthorized",
+      data: { hasSignature: Boolean(signature), hasLegacySecret: Boolean(legacySecret) },
+      hypothesisId: "H9",
+    });
+    // #endregion
     return NextResponse.json({ error: "Webhook no autorizado" }, { status: 401 });
   }
 
@@ -395,26 +443,71 @@ async function handleOpenWaWebhook(request: Request) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { from, body, messageId, fromMe, isGroup, event } = extractOpenWaWebhookMessage(payload);
+  const { from, chatId, body, messageId, senderPhone, fromMe, isGroup, event } =
+    extractOpenWaWebhookMessage(payload);
+  const effectiveEvent = event || headerEvent || "";
 
   if (fromMe || isGroup) {
     return NextResponse.json({ ignored: true, reason: "Mensaje propio o de grupo" });
   }
 
-  if (event && event !== "message.received") {
+  if (effectiveEvent && effectiveEvent !== "message.received") {
     return NextResponse.json({ ignored: true, reason: "Evento no soportado" });
   }
 
   if (!from || !body) {
+    // #region agent log
+    logEntry({
+      location: "openwa:webhook",
+      message: "Incomplete webhook message",
+      data: { fromSuffix: from.slice(-12), bodyLen: body.length, type: payload.data?.type ?? null },
+      hypothesisId: "H12",
+      runId: "post-fix",
+    });
+    // #endregion
     return NextResponse.json({ ignored: true, reason: "Mensaje incompleto" });
   }
 
-  const donor = await findDonorByOpenWaContact(from, openWaContext(settings));
+  const waCtx = openWaContext(settings);
+  const donor = await findDonorByOpenWaContact(from, waCtx, { senderPhone });
+  // #region agent log
+  const { agentDebugLog } = await import("@/lib/debug-log");
+  agentDebugLog({
+    location: "openwa:webhook",
+    message: "Incoming WhatsApp message",
+    data: {
+      fromSuffix: from.slice(-12),
+      chatIdSuffix: chatId.slice(-12),
+      bodyPreview: body.slice(0, 40),
+      senderPhoneHint: senderPhone ? senderPhone.slice(-4) : null,
+      donorFound: Boolean(donor),
+      donorHasPhone: Boolean(donor?.phone),
+      openWaConfigured: openWaConfigured(settings),
+      isAffirmative: isAffirmativeReply(body),
+    },
+    hypothesisId: "H7",
+    runId: "post-fix",
+  });
+  // #endregion
   if (!donor || !donor.phone) {
-    return NextResponse.json({ ignored: true, reason: "Donante no encontrado" });
+    const phoneHint = senderPhone || from.replace(/@c\.us$/i, "").replace(/\D/g, "");
+    const notAccepted = phoneHint ? await findInactiveAcceptedDonorByPhone(phoneHint) : null;
+    if (notAccepted?.phone && openWaConfigured(settings)) {
+      await notifyDonorWhatsApp(settings, {
+        donorId: notAccepted.id,
+        phone: notAccepted.phone,
+        chatId: chatId.includes("@") ? chatId : from,
+        message:
+          "Hola, su registro aparece como no aceptado en el sistema. Contacte al banco de sangre para actualizar su ficha antes de agendar.",
+      }).catch(() => {});
+    }
+    return NextResponse.json({
+      ignored: true,
+      reason: notAccepted ? "Donante no aceptado" : "Donante no encontrado",
+    });
   }
 
-  const replyChatId = from.includes("@") ? from : "";
+  const replyChatId = chatId.includes("@") ? chatId : from.includes("@") ? from : "";
   let replyToMessageId = messageId || undefined;
   if (replyChatId.endsWith("@lid") && openWaConfigured(settings)) {
     const openWaMessageId = await resolveLatestIncomingMessageId(
