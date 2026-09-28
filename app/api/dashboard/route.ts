@@ -3,9 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { handlePrismaRouteError, withAuth } from "@/lib/api";
 import { getEligibleDonors, serializeEligible } from "@/lib/eligibility";
 import { endOfDay, startOfDay } from "@/lib/dates";
+import { agentDebugLog } from "@/lib/debug-log";
 
 export async function GET() {
+  const t0 = Date.now();
   const { error } = await withAuth();
+  const tAuth = Date.now();
   if (error) return error;
 
   const todayStart = startOfDay(new Date());
@@ -28,6 +31,21 @@ export async function GET() {
           where: { status: "fallido", sentAt: { gte: todayStart, lte: todayEnd } },
         }),
       ]);
+    const tDone = Date.now();
+    // #region agent log
+    agentDebugLog({
+      hypothesisId: "PERF-E",
+      location: "app/api/dashboard/route.ts:GET",
+      message: "dashboard_timing",
+      data: {
+        authMs: tAuth - t0,
+        dataMs: tDone - tAuth,
+        totalMs: tDone - t0,
+        eligibleCount: eligible.length,
+        totalDonors,
+      },
+    });
+    // #endregion
 
     return NextResponse.json({
       reminderDays,

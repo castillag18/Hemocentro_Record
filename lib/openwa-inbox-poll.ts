@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "./fetch-timeout";
 import { prisma } from "./prisma";
 import { agentDebugLog } from "./debug-log";
 import { openWaHeaders, resolveOpenWaSessionUuid } from "./openwa-session";
@@ -37,9 +38,10 @@ async function fetchRecentIncomingMessages(settings: Awaited<ReturnType<typeof g
   };
   const sessionUuid = await resolveOpenWaSessionUuid(ctx);
   const base = ctx.baseUrl.replace(/\/$/, "");
-  const res = await fetch(`${base}/api/sessions/${encodeURIComponent(sessionUuid)}/messages?limit=80`, {
-    headers: openWaHeaders(ctx.apiKey),
-  });
+  const res = await fetchWithTimeout(
+    `${base}/api/sessions/${encodeURIComponent(sessionUuid)}/messages?limit=40`,
+    { headers: openWaHeaders(ctx.apiKey), timeoutMs: 8000 },
+  );
   const data = (await res.json().catch(() => ({}))) as { messages?: OpenWaListedMessage[] };
   if (!res.ok || !data.messages?.length) return [];
 

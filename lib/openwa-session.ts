@@ -1,5 +1,11 @@
+import { fetchWithTimeout } from "./fetch-timeout";
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function openWaFetch(input: RequestInfo | URL, init?: RequestInit) {
+  return fetchWithTimeout(input, { ...init, timeoutMs: 8000 });
+}
 
 export type OpenWaSessionSummary = {
   id: string;
@@ -34,7 +40,7 @@ async function parseOpenWaError(res: Response, fallback: string) {
 
 export async function listOpenWaSessions(options: { baseUrl: string; apiKey: string }) {
   const base = options.baseUrl.replace(/\/$/, "");
-  const res = await fetch(`${base}/api/sessions`, { headers: openWaHeaders(options.apiKey) });
+  const res = await openWaFetch(`${base}/api/sessions`, { headers: openWaHeaders(options.apiKey) });
   if (!res.ok) await parseOpenWaError(res, "No se pudo listar sesiones OpenWA");
   const data = (await res.json()) as OpenWaSessionSummary[];
   return Array.isArray(data) ? data : [];
@@ -45,7 +51,7 @@ async function openWaSessionExists(
   uuid: string,
 ) {
   const base = options.baseUrl.replace(/\/$/, "");
-  const res = await fetch(`${base}/api/sessions/${encodeURIComponent(uuid)}`, {
+  const res = await openWaFetch(`${base}/api/sessions/${encodeURIComponent(uuid)}`, {
     headers: openWaHeaders(options.apiKey),
   });
   return res.ok;
@@ -70,7 +76,7 @@ export async function resolveOpenWaSessionUuid(options: {
   if (existing?.id) return existing.id;
 
   const base = options.baseUrl.replace(/\/$/, "");
-  const res = await fetch(`${base}/api/sessions`, {
+  const res = await openWaFetch(`${base}/api/sessions`, {
     method: "POST",
     headers: openWaHeaders(options.apiKey),
     body: JSON.stringify({ name }),

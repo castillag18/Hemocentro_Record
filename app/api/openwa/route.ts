@@ -17,7 +17,9 @@ import {
   startOpenWaSession,
   testOpenWaConnection,
 } from "@/lib/openwa";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 import { pollOpenWaInbox } from "@/lib/openwa-inbox-poll";
+import { agentDebugLog } from "@/lib/debug-log";
 
 type OpenWaBody = {
   action?: string;
@@ -208,26 +210,18 @@ export async function POST(request: Request) {
     }
 
     if (body.action === "status") {
+      const t0 = Date.now();
       const status = await getOpenWaSessionStatus(opts);
       const sentToday = await import("@/lib/whatsapp-limit").then((m) => m.getWhatsappSentTodayCount());
-      const webhookCandidates = resolveOpenWaWebhookRegisterCandidates();
       const webhookUrl = resolveOpenWaWebhookUrl();
-      let webhookRegistered: boolean | undefined;
-      if (status.status.toLowerCase() === "ready") {
-        const base = opts.baseUrl.replace(/\/$/, "");
-        const list = await fetch(
-          `${base}/api/sessions/${encodeURIComponent(status.sessionUuid)}/webhooks`,
-          { headers: { "X-API-Key": opts.apiKey } },
-        )
-          .then((r) => r.json().catch(() => []))
-          .catch(() => []);
-        webhookRegistered =
-          Array.isArray(list) &&
-          list.some(
-            (hook: { url?: string; active?: boolean }) =>
-              Boolean(hook.url && webhookCandidates.includes(hook.url) && hook.active !== false),
-          );
-      }
+      // #region agent log
+      agentDebugLog({
+        hypothesisId: "PERF-C",
+        location: "app/api/openwa/route.ts:status",
+        message: "openwa_status_timing",
+        data: { totalMs: Date.now() - t0, openWaStatus: status.status },
+      });
+      // #endregion
       return NextResponse.json({
         status: status.status,
         phone: status.phone,
@@ -237,14 +231,45 @@ export async function POST(request: Request) {
         sentToday,
         limit,
         webhookUrl,
-        webhookRegistered,
         inboxPollingEnabled: status.status.toLowerCase() === "ready",
       });
     }
 
     if (body.action === "poll-inbox") {
+      const t0 = Date.now();
       const poll = await pollOpenWaInbox(settings);
+      // #region agent log
+      agentDebugLog({
+        hypothesisId: "PERF-D",
+        location: "app/api/openwa/route.ts:poll-inbox",
+        message: "openwa_poll_timing",
+        data: { totalMs: Date.now() - t0, processed: poll.processed, skipped: poll.skipped },
+      });
+      // #endregion
       return NextResponse.json({ ok: true, ...poll });
+    }
+
+    if (body.action === "check-webhook") {
+      const status = await getOpenWaSessionStatus(opts);
+      const webhookUrl = resolveOpenWaWebhookUrl();
+      let webhookRegistered = false;
+      if (status.status.toLowerCase() === "ready") {
+        const base = opts.baseUrl.replace(/\/$/, "");
+        const candidates = resolveOpenWaWebhookRegisterCandidates();
+        const list = await fetchWithTimeout(
+          `${base}/api/sessions/${encodeURIComponent(status.sessionUuid)}/webhooks`,
+          { headers: { "X-API-Key": opts.apiKey }, timeoutMs: 8000 },
+        )
+          .then((r) => r.json().catch(() => []))
+          .catch(() => []);
+        webhookRegistered =
+          Array.isArray(list) &&
+          list.some(
+            (hook: { url?: string; active?: boolean }) =>
+              Boolean(hook.url && candidates.includes(hook.url) && hook.active !== false),
+          );
+      }
+      return NextResponse.json({ webhookUrl, webhookRegistered });
     }
 
     if (body.action === "register-webhook") {

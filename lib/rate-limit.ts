@@ -21,13 +21,18 @@ export function getClientIp(request: Request): string {
   return "127.0.0.1";
 }
 
+const BLACKLIST_DB_TIMEOUT_MS = 2500;
+
 async function isBlacklisted(ip: string): Promise<boolean> {
   const memExpiry = memoryBlacklist.get(ip);
   if (memExpiry && memExpiry > Date.now()) return true;
   if (memExpiry) memoryBlacklist.delete(ip);
 
   try {
-    const row = await prisma.ipBlacklist.findUnique({ where: { ip } });
+    const row = await Promise.race([
+      prisma.ipBlacklist.findUnique({ where: { ip } }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), BLACKLIST_DB_TIMEOUT_MS)),
+    ]);
     if (!row) return false;
     if (row.expiresAt && row.expiresAt.getTime() < Date.now()) {
       await prisma.ipBlacklist.delete({ where: { ip } }).catch(() => {});

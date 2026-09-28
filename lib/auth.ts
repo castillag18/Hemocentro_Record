@@ -42,7 +42,7 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
   }
 }
 
-export async function getSession(): Promise<SessionPayload | null> {
+async function loadSessionUser(): Promise<SessionUser | null> {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
@@ -51,21 +51,20 @@ export async function getSession(): Promise<SessionPayload | null> {
 
   const user = await prisma.adminUser.findUnique({
     where: { id: payload.userId },
-    select: { active: true, email: true },
+    select: { role: true, name: true, active: true, email: true },
   });
   if (!user?.active) return null;
-  return payload;
+  return { userId: payload.userId, email: user.email, role: user.role, name: user.name };
+}
+
+export async function getSession(): Promise<SessionPayload | null> {
+  const user = await loadSessionUser();
+  if (!user) return null;
+  return { userId: user.userId, email: user.email };
 }
 
 export async function getSessionUser(): Promise<SessionUser | null> {
-  const session = await getSession();
-  if (!session) return null;
-  const user = await prisma.adminUser.findUnique({
-    where: { id: session.userId },
-    select: { role: true, name: true, active: true },
-  });
-  if (!user?.active) return null;
-  return { ...session, role: user.role, name: user.name };
+  return loadSessionUser();
 }
 
 export async function requireApiAuth() {

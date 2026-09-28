@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "./fetch-timeout";
 import {
   isOpenWaSessionUuid,
   listOpenWaSessions,
@@ -6,6 +7,10 @@ import {
   resolveOpenWaSessionUuid,
   type OpenWaSessionSummary,
 } from "./openwa-session";
+
+function openWaFetch(input: RequestInfo | URL, init?: RequestInit) {
+  return fetchWithTimeout(input, { ...init, timeoutMs: 8000 });
+}
 import { resolveOpenWaWebhookRegisterCandidates } from "./openwa-webhook-url";
 import {
   openWaConfigured,
@@ -38,7 +43,7 @@ export async function startOpenWaSession(options: {
 }) {
   const base = options.baseUrl.replace(/\/$/, "");
   const { sessionUuid } = await withSessionUuid(options, async (uuid) => {
-    const res = await fetch(`${base}/api/sessions/${encodeURIComponent(uuid)}/start`, {
+    const res = await openWaFetch(`${base}/api/sessions/${encodeURIComponent(uuid)}/start`, {
       method: "POST",
       headers: openWaHeaders(options.apiKey),
     });
@@ -103,7 +108,7 @@ export async function getOpenWaQr(options: {
 }) {
   const base = options.baseUrl.replace(/\/$/, "");
   const { sessionUuid, result } = await withSessionUuid(options, async (uuid) => {
-    const res = await fetch(`${base}/api/sessions/${encodeURIComponent(uuid)}/qr`, {
+    const res = await openWaFetch(`${base}/api/sessions/${encodeURIComponent(uuid)}/qr`, {
       headers: openWaHeaders(options.apiKey),
     });
 
@@ -140,7 +145,7 @@ export async function getOpenWaSessionStatus(options: {
 }) {
   const base = options.baseUrl.replace(/\/$/, "");
   const { sessionUuid, result } = await withSessionUuid(options, async (uuid) => {
-    const res = await fetch(`${base}/api/sessions/${encodeURIComponent(uuid)}`, {
+    const res = await openWaFetch(`${base}/api/sessions/${encodeURIComponent(uuid)}`, {
       headers: openWaHeaders(options.apiKey),
     });
     const data = (await res.json().catch(() => ({}))) as OpenWaSessionSummary & {
@@ -168,7 +173,7 @@ export async function testOpenWaConnection(options: {
   sessionId: string;
 }) {
   const base = options.baseUrl.replace(/\/$/, "");
-  const healthRes = await fetch(`${base}/api/health`, {
+  const healthRes = await openWaFetch(`${base}/api/health`, {
     headers: openWaHeaders(options.apiKey),
   });
   const health = (await healthRes.json().catch(() => ({}))) as {
@@ -198,7 +203,7 @@ export async function registerOpenWaWebhook(options: {
   const base = options.baseUrl.replace(/\/$/, "");
   const sessionUuid = await resolveOpenWaSessionUuid(options);
 
-  const listRes = await fetch(`${base}/api/sessions/${encodeURIComponent(sessionUuid)}/webhooks`, {
+  const listRes = await openWaFetch(`${base}/api/sessions/${encodeURIComponent(sessionUuid)}/webhooks`, {
     headers: openWaHeaders(options.apiKey),
   });
   if (listRes.ok) {
@@ -209,7 +214,7 @@ export async function registerOpenWaWebhook(options: {
     }
   }
 
-  const res = await fetch(`${base}/api/sessions/${encodeURIComponent(sessionUuid)}/webhooks`, {
+  const res = await openWaFetch(`${base}/api/sessions/${encodeURIComponent(sessionUuid)}/webhooks`, {
     method: "POST",
     headers: openWaHeaders(options.apiKey),
     body: JSON.stringify({

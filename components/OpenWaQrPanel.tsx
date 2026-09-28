@@ -114,34 +114,31 @@ export function OpenWaQrPanel({
     }
   }, [enabled, config.whatsappMode, payload, applySessionUuid, qrSrc]);
 
-  const pollInbox = useCallback(async () => {
+  const checkWebhook = useCallback(async () => {
     if (!enabled || config.whatsappMode !== "openwa" || status.toLowerCase() !== "ready") return;
     try {
-      const data = await api<{ processed?: number; skipped?: number; error?: string }>("/api/openwa", {
+      const data = await api<{ webhookUrl?: string; webhookRegistered?: boolean }>("/api/openwa", {
         method: "POST",
-        body: JSON.stringify({ action: "poll-inbox", ...payload }),
+        body: JSON.stringify({ action: "check-webhook", ...payload }),
       });
-      if (data.processed && data.processed > 0) {
-        setNotice(`Respuestas procesadas: ${data.processed}`);
-      }
+      if (data.webhookUrl) setWebhookUrl(data.webhookUrl);
+      if (data.webhookRegistered != null) setWebhookRegistered(data.webhookRegistered);
     } catch {
-      /* sondeo silencioso */
+      /* consulta opcional */
     }
   }, [enabled, config.whatsappMode, payload, status]);
 
   useEffect(() => {
     if (!enabled || config.whatsappMode !== "openwa") return;
     void refresh();
-    const timer = setInterval(() => void refresh(), 30000);
+    const timer = setInterval(() => void refresh(), 60000);
     return () => clearInterval(timer);
   }, [enabled, config.whatsappMode, refresh]);
 
   useEffect(() => {
     if (!enabled || status.toLowerCase() !== "ready") return;
-    void pollInbox();
-    const timer = setInterval(() => void pollInbox(), 20000);
-    return () => clearInterval(timer);
-  }, [enabled, status, pollInbox]);
+    void checkWebhook();
+  }, [enabled, status, checkWebhook]);
 
   useEffect(() => {
     if (status.toLowerCase() !== "qr_ready" || !enabled) return;
@@ -250,7 +247,7 @@ export function OpenWaQrPanel({
         setError("");
       } else {
         setError(data.message);
-        setNotice("El sondeo de bandeja sigue activo aunque el webhook falle.");
+        setNotice("Configure SSRF en OpenWA o use el sondeo por cron (npm run openwa:poll-inbox).");
       }
       });
     } catch (err) {
@@ -323,8 +320,9 @@ export function OpenWaQrPanel({
         <div className="rounded-lg border border-outline-variant bg-surface-container-lowest p-3 space-y-2">
           <p className="text-body-sm font-medium text-on-surface">Respuestas de donantes (agendamiento)</p>
           <p className="text-body-xs text-secondary">
-            Las respuestas «Sí» se procesan por <strong>sondeo automático</strong> cada 20 s (con esta página abierta).
-            El webhook es opcional; OpenWA puede bloquearlo por SSRF en redes Docker.
+            Las respuestas «Sí» se procesan por <strong>sondeo en servidor</strong> (cron:{" "}
+            <code className="text-body-xs">npm run openwa:poll-inbox</code> cada minuto).
+            El webhook es opcional; OpenWA puede bloquearlo por SSRF en Docker.
           </p>
           {webhookUrl ? (
             <p className="text-body-xs font-mono text-secondary break-all">URL: {webhookUrl}</p>
