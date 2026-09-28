@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { usesSecureCookies } from "@/lib/cookie-secure";
 import { agentDebugLog } from "@/lib/debug-log";
 import {
+  detectGoogleOAuthDeployment,
+  isGoogleAllowedOAuthUrl,
+} from "@/lib/google-oauth-url";
+import {
   getGoogleJavascriptOrigin,
   getGoogleRedirectUri,
   googleOAuthConfigured,
@@ -12,6 +16,8 @@ export async function GET() {
   const configured = await googleOAuthConfigured();
   const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() ?? "";
   const redirectUri = getGoogleRedirectUri();
+  const redirectAllowedByGoogle = isGoogleAllowedOAuthUrl(redirectUri);
+  const deployment = detectGoogleOAuthDeployment(redirectUri, appUrl);
   const payload = {
     configured,
     fromEnv: googleOAuthEnvConfigured(),
@@ -19,6 +25,8 @@ export async function GET() {
     javascriptOrigin: getGoogleJavascriptOrigin(),
     appUrl,
     cookieSecure: usesSecureCookies(),
+    redirectAllowedByGoogle,
+    oauthDeployment: deployment,
     redirectMatchesAppUrl: appUrl
       ? redirectUri.startsWith(appUrl.replace(/\/$/, ""))
       : null,

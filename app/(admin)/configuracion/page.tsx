@@ -152,8 +152,8 @@ export default function ConfiguracionPage() {
         redirectUri: string;
         javascriptOrigin: string;
         appUrl: string;
-        cookieSecure: boolean;
-        redirectMatchesAppUrl: boolean | null;
+        redirectAllowedByGoogle: boolean;
+        oauthDeployment: string;
       }>("/api/auth/google/status");
       if (!status.configured) {
         void alertInfo(
@@ -162,19 +162,10 @@ export default function ConfiguracionPage() {
         );
         return;
       }
-      const browserOrigin =
-        typeof window !== "undefined" ? window.location.origin.replace(/\/$/, "") : "";
-      if (browserOrigin && status.javascriptOrigin !== browserOrigin) {
+      if (!status.redirectAllowedByGoogle) {
         void alertInfo(
-          "URL del servidor no coincide",
-          `Está abriendo la app en:\n${browserOrigin}\n\nPero el .env del servidor tiene:\nNEXT_PUBLIC_APP_URL=${status.appUrl}\nGOOGLE_REDIRECT_URI=${status.redirectUri}\n\nCorrija el .env (use la IP de la VM, ej. http://192.168.1.112:3000), reinicie la app y registre la misma URI en Google Cloud Console.`,
-        );
-        return;
-      }
-      if (status.redirectMatchesAppUrl === false) {
-        void alertInfo(
-          "Redirect URI inconsistente",
-          `GOOGLE_REDIRECT_URI no coincide con NEXT_PUBLIC_APP_URL.\n\nRedirect: ${status.redirectUri}\nApp: ${status.appUrl}`,
+          "Google no acepta IPs privadas en OAuth",
+          `La URI configurada (${status.redirectUri}) usa una IP de red local.\n\nGoogle Cloud solo permite:\n• http://localhost:3000 (desarrollo en la misma PC)\n• https://dominio-publico... (producción o túnel ngrok/Cloudflare)\n\nOpciones para el hemocentro:\n1) Túnel: ngrok http 3000 → registre la URL https en Google y en GOOGLE_REDIRECT_URI\n2) CLI: npm run google:connect-calendar (con localhost en Google Console)\n3) Cuenta de servicio: GOOGLE_CALENDAR_CREDENTIALS_JSON (sin OAuth web)\n\nLos usuarios pueden seguir usando http://192.168.1.112:3000 en la LAN; solo OAuth necesita URL pública o localhost.`,
         );
         return;
       }
@@ -484,6 +475,33 @@ export default function ConfiguracionPage() {
                           Credenciales OAuth cargadas desde el .env del servidor
                         </p>
                       ) : null}
+                      <div className="rounded-lg border border-amber-soft bg-amber-soft/40 p-3 text-body-sm text-secondary space-y-1">
+                        <p className="font-medium text-on-surface">
+                          Google no permite IPs LAN (192.168.x.x) en OAuth web
+                        </p>
+                        <p>
+                          La app puede usarse en <code>http://192.168.1.112:3000</code>, pero para
+                          conectar Calendar use una de estas opciones:
+                        </p>
+                        <ul className="list-disc pl-5 space-y-1">
+                          <li>
+                            <strong>Túnel HTTPS</strong> (ngrok / Cloudflare Tunnel): registre la URL
+                            pública en Google Console y en <code>GOOGLE_REDIRECT_URI</code>
+                          </li>
+                          <li>
+                            <strong>localhost</strong>: solo desarrollo en la misma PC (
+                            <code>http://localhost:3000</code>)
+                          </li>
+                          <li>
+                            <strong>Cuenta de servicio</strong>: pegue el JSON en Configuración
+                            avanzada (sin OAuth web)
+                          </li>
+                        </ul>
+                        <p>
+                          También puede usar <code>npm run google:connect-calendar</code> en el
+                          servidor con localhost registrado en Google Cloud.
+                        </p>
+                      </div>
                       <p className="text-body-md text-secondary">
                         Conecte la cuenta Google del hemocentro (ej. correo del funcionario que revisa
                         el calendario). Sin esta conexión, las citas se guardan en la app pero{" "}

@@ -443,9 +443,10 @@ Las credenciales OAuth se configuran **solo en `.env`** (no en la interfaz de us
 1. Cree un proyecto en [Google Cloud Console](https://console.cloud.google.com/)
 2. **APIs y servicios → Credenciales → Crear credenciales → ID de cliente OAuth**
 3. Tipo: **Aplicación web**
-4. Configure:
-   - **Orígenes JS autorizados:** `http://<IP-SERVIDOR>:3000`
-   - **URIs de redirección:** `http://<IP-SERVIDOR>:3000/api/auth/google/callback`
+4. Configure (**Google no acepta IPs privadas** `192.168.x.x` en clientes web):
+   - **Desarrollo local:** `http://localhost:3000` y redirect `http://localhost:3000/api/auth/google/callback`
+   - **Servidor en LAN:** túnel HTTPS (ngrok / Cloudflare) o **cuenta de servicio** (ver [INSTALACION-SERVIDOR.md](./INSTALACION-SERVIDOR.md) §10)
+   - **Producción:** dominio público `https://su-dominio.org`
 5. Copie **ID de cliente** y **Secreto de cliente** al `.env`
 
 ### 7.2 Variables en `.env`

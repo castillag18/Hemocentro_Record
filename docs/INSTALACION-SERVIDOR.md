@@ -90,7 +90,8 @@ DATABASE_URL="mysql://He_mo_center:H%2A3M0eNt3R@192.168.1.4:3306/huav"
 
 NEXT_PUBLIC_APP_URL="http://192.168.1.112:3000"
 NODE_ENV="production"
-GOOGLE_REDIRECT_URI="http://192.168.1.112:3000/api/auth/google/callback"
+# Google OAuth NO acepta 192.168.x.x — ver sección 10
+GOOGLE_REDIRECT_URI="https://SU-TUNEL.ngrok-free.app/api/auth/google/callback"
 
 WHATSAPP_OPENWA_API_KEY="owa_k1_..."
 OPENWA_WEBHOOK_SECRET="secreto-minimo-16-caracteres"
@@ -272,7 +273,59 @@ En **producción** (`npm run build` + `npm run start`) este bloqueo no aplica.
 
 ---
 
-## 10. Solución de problemas
+## 10. Google Calendar en red LAN (sin dominio público)
+
+**Google Cloud no permite** registrar `http://192.168.1.112:3000` en un cliente OAuth tipo *Aplicación web*. Solo acepta:
+
+| Entorno | Origen / redirect en Google Console |
+|---|---|
+| Desarrollo en la misma PC | `http://localhost:3000` |
+| Servidor LAN + túnel | `https://xxx.ngrok-free.app` (o Cloudflare Tunnel) |
+| Producción | `https://su-dominio.org` |
+
+El personal **sigue usando** `http://192.168.1.112:3000` en la red interna. Solo la **conexión OAuth** necesita URL permitida por Google.
+
+### Opción A — Túnel HTTPS (recomendada en la VM)
+
+```bash
+# En la VM, con ngrok instalado:
+ngrok http 3000
+```
+
+1. Copie la URL `https://....ngrok-free.app`
+2. En Google Cloud → Orígenes JS: `https://....ngrok-free.app`
+3. URI redirect: `https://....ngrok-free.app/api/auth/google/callback`
+4. En `.env` del servidor:
+
+```env
+NEXT_PUBLIC_APP_URL="http://192.168.1.112:3000"
+GOOGLE_REDIRECT_URI="https://....ngrok-free.app/api/auth/google/callback"
+```
+
+5. Reinicie la app → Configuración → **Conectar Google Calendar**
+
+> Mantenga ngrok activo mientras conecta Calendar. Tras guardar el refresh token, el túnel ya no es necesario para crear eventos.
+
+### Opción B — Script CLI con localhost
+
+Si puede abrir Google OAuth desde la VM (navegador o SSH con reenvío de puertos):
+
+1. En Google Console registre solo `http://localhost:3000`
+2. En `.env`: `GOOGLE_REDIRECT_URI="http://localhost:3000/api/auth/google/callback"`
+3. Ejecute: `npm run google:connect-calendar`
+
+### Opción C — Cuenta de servicio (sin OAuth web)
+
+1. Google Cloud → **Cuenta de servicio** → descargue JSON
+2. Comparta el calendario del hemocentro con el email de la cuenta de servicio (permiso * hacer cambios*)
+3. Configuración → **Configuración avanzada** → pegue el JSON en *Credenciales JSON Google*
+4. Indique el **ID del calendario** compartido
+
+No requiere redirect URI ni túnel.
+
+---
+
+## 11. Solución de problemas
 
 | Problema | Solución |
 |---|---|
@@ -282,10 +335,12 @@ En **producción** (`npm run build` + `npm run start`) este bloqueo no aplica.
 | OpenWA: session not found | Configuración → nombre sesión `default` → Generar QR |
 | Webhook no llega | En Linux use `172.17.0.1` en `OPENWA_WEBHOOK_URL`, no `host.docker.internal` |
 | Puerto 3000 ocupado | `PORT=3001` en `.env` y reinicie |
+| Google OAuth: IP no válida | Use túnel HTTPS, localhost o cuenta de servicio (sección 10) |
+| Calendar conectado pero sin eventos | `npm run google:test-calendar` o cuenta de servicio + calendario compartido |
 
 ---
 
-## 9. Referencia rápida
+## 12. Referencia rápida
 
 ```bash
 npm run db:ensure          # Solo crear/verificar BD
