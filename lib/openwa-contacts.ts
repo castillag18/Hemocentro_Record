@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "./fetch-timeout";
 import { prisma } from "./prisma";
 import { normalizePhone } from "./whatsapp";
 import { openWaHeaders, resolveOpenWaSessionUuid } from "./openwa-session";
@@ -20,9 +21,9 @@ export async function resolveOpenWaContactPhone(
     sessionId: ctx.sessionId,
   });
   const base = ctx.baseUrl.replace(/\/$/, "");
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `${base}/api/sessions/${encodeURIComponent(sessionUuid)}/contacts/${encodeURIComponent(contactId)}/phone`,
-    { headers: openWaHeaders(ctx.apiKey) },
+    { headers: openWaHeaders(ctx.apiKey), timeoutMs: 8000 },
   );
 
   if (!res.ok) return null;

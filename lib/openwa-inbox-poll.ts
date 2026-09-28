@@ -1,6 +1,7 @@
 import { fetchWithTimeout } from "./fetch-timeout";
 import { prisma } from "./prisma";
 import { agentDebugLog } from "./debug-log";
+import { resolveOpenWaContactPhone } from "./openwa-contacts";
 import { openWaHeaders, resolveOpenWaSessionUuid } from "./openwa-session";
 import { processOpenWaInboundMessage } from "./openwa-inbound";
 import { getSettings } from "./settings";
@@ -11,11 +12,44 @@ const POLL_WINDOW_MS = 48 * 60 * 60 * 1000;
 type OpenWaListedMessage = {
   id?: string;
   body?: string | null;
+  text?: string | null;
   chatId?: string;
   direction?: string;
   createdAt?: string;
   type?: string;
+  selectedButtonId?: string;
+  selectedRowId?: string;
 };
+
+function extractMessageBody(message: OpenWaListedMessage) {
+  return String(
+    message.body?.trim() ||
+      message.text?.trim() ||
+      message.selectedButtonId?.trim() ||
+      message.selectedRowId?.trim() ||
+      "",
+  ).trim();
+}
+
+function shouldMarkMessageProcessed(result: Record<string, unknown>) {
+  if (result.ok === true) {
+    return result.deliveryFailed !== true;
+  }
+  if (result.error) return true;
+  if (result.ignored === true) {
+    const reason = String(result.reason ?? "");
+    if (
+      reason === "No es una respuesta afirmativa" ||
+      reason === "Donante no encontrado" ||
+      reason === "Donante no aceptado" ||
+      reason === "Mensaje incompleto"
+    ) {
+      return false;
+    }
+    return true;
+  }
+  return false;
+}
 
 async function isMessageProcessed(messageId: string) {
   const row = await prisma.openWaProcessedMessage.findUnique({ where: { messageId } });
@@ -48,7 +82,7 @@ async function fetchRecentIncomingMessages(settings: Awaited<ReturnType<typeof g
   const since = Date.now() - POLL_WINDOW_MS;
   return data.messages.filter((message) => {
     if (message.direction !== "incoming") return false;
-    if (!message.id || !message.body?.trim()) return false;
+    if (!message.id || !extractMessageBody(message)) return false;
     if (message.type && !["text", "buttons_response", "list_response"].includes(message.type)) {
       return false;
     }
@@ -90,13 +124,26 @@ export async function pollOpenWaInbox(settingsInput?: Awaited<ReturnType<typeof 
 
       const chatId = message.chatId ?? "";
       const from = chatId.includes("@") ? chatId : chatId;
+      const body = extractMessageBody(message);
+      const ctx = {
+        baseUrl: settings.whatsappOpenWaUrl,
+        apiKey: settings.whatsappOpenWaApiKey || process.env.WHATSAPP_OPENWA_API_KEY || "",
+        sessionId: settings.whatsappOpenWaSessionId,
+      };
+      let senderPhone: string | undefined;
+      if (from.endsWith("@lid")) {
+        const resolved = await resolveOpenWaContactPhone(ctx, from).catch(() => null);
+        if (resolved) senderPhone = resolved;
+      }
+
       let result: Awaited<ReturnType<typeof processOpenWaInboundMessage>>;
       try {
         result = await processOpenWaInboundMessage(settings, {
           from,
           chatId: from,
-          body: String(message.body).trim(),
+          body,
           messageId,
+          senderPhone,
           source: "poll",
         });
       } catch (err) {
@@ -107,13 +154,21 @@ export async function pollOpenWaInbox(settingsInput?: Awaited<ReturnType<typeof 
         continue;
       }
 
-      const actionable =
-        Boolean((result as { ok?: boolean }).ok) ||
-        Boolean((result as { error?: string }).error) ||
-        ((result as { ignored?: boolean }).ignored &&
-          (result as { reason?: string }).reason !== "No es una respuesta afirmativa");
+      agentDebugLog({
+        location: "openwa:poll",
+        message: "Message processed",
+        data: {
+          messageId,
+          chatSuffix: from.slice(-15),
+          bodyPreview: body.slice(0, 30),
+          senderPhone: senderPhone ? `***${senderPhone.slice(-4)}` : null,
+          result,
+        },
+        hypothesisId: "H15",
+        runId: "post-fix",
+      });
 
-      if (actionable) {
+      if (shouldMarkMessageProcessed(result as Record<string, unknown>)) {
         await markMessageProcessed(messageId, "poll");
         processed += 1;
         results.push(result);

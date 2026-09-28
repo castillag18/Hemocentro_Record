@@ -378,7 +378,10 @@ export async function processOpenWaInboundMessage(
     };
   }
 
-  const replyChatId = chatId.includes("@") ? chatId : from.includes("@") ? from : "";
+  const replyChatId =
+    (chatId.includes("@") ? chatId : from.includes("@") ? from : "") ||
+    donor?.whatsappChatId ||
+    "";
   let replyToMessageId = messageId || undefined;
   if (replyChatId.endsWith("@lid") && openWaConfigured(settings)) {
     const openWaMessageId = await resolveLatestIncomingMessageId(waCtx, replyChatId);

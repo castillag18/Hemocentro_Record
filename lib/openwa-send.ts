@@ -239,11 +239,16 @@ export async function sendOpenWaTextMessage(
     }
   }
 
-  const res = await fetch(`${base}/api/sessions/${encodeURIComponent(sessionUuid)}/messages/send-text`, {
-    method: "POST",
-    headers: openWaHeaders(ctx.apiKey),
-    body: JSON.stringify({ chatId, text: ctx.text }),
-  });
+  const { fetchWithTimeout } = await import("./fetch-timeout");
+  const res = await fetchWithTimeout(
+    `${base}/api/sessions/${encodeURIComponent(sessionUuid)}/messages/send-text`,
+    {
+      method: "POST",
+      headers: openWaHeaders(ctx.apiKey),
+      body: JSON.stringify({ chatId, text: ctx.text }),
+      timeoutMs: 12000,
+    },
+  );
   const data = await parseOpenWaJson(res);
 
   if (res.status === 201 || res.ok) {
