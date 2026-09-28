@@ -25,7 +25,7 @@ type OpenWaStatusResponse = {
   webhookUrl?: string;
   webhookRegistered?: boolean;
   webhookWarning?: string;
-  inboxPoll?: { processed?: number; skipped?: number };
+  inboxPollingEnabled?: boolean;
 };
 
 export function OpenWaQrPanel({
@@ -88,11 +88,6 @@ export function OpenWaQrPanel({
       applySessionUuid(data.sessionUuid);
       if (data.webhookUrl) setWebhookUrl(data.webhookUrl);
       if (data.webhookRegistered != null) setWebhookRegistered(data.webhookRegistered);
-      if (data.webhookWarning) {
-        setError(data.webhookWarning);
-      } else {
-        setError("");
-      }
 
       if (data.status.toLowerCase() === "qr_ready" && !qrSrc) {
         const qrData = await api<{
@@ -119,12 +114,34 @@ export function OpenWaQrPanel({
     }
   }, [enabled, config.whatsappMode, payload, applySessionUuid, qrSrc]);
 
+  const pollInbox = useCallback(async () => {
+    if (!enabled || config.whatsappMode !== "openwa" || status.toLowerCase() !== "ready") return;
+    try {
+      const data = await api<{ processed?: number; skipped?: number; error?: string }>("/api/openwa", {
+        method: "POST",
+        body: JSON.stringify({ action: "poll-inbox", ...payload }),
+      });
+      if (data.processed && data.processed > 0) {
+        setNotice(`Respuestas procesadas: ${data.processed}`);
+      }
+    } catch {
+      /* sondeo silencioso */
+    }
+  }, [enabled, config.whatsappMode, payload, status]);
+
   useEffect(() => {
     if (!enabled || config.whatsappMode !== "openwa") return;
     void refresh();
-    const timer = setInterval(() => void refresh(), 15000);
+    const timer = setInterval(() => void refresh(), 30000);
     return () => clearInterval(timer);
   }, [enabled, config.whatsappMode, refresh]);
+
+  useEffect(() => {
+    if (!enabled || status.toLowerCase() !== "ready") return;
+    void pollInbox();
+    const timer = setInterval(() => void pollInbox(), 20000);
+    return () => clearInterval(timer);
+  }, [enabled, status, pollInbox]);
 
   useEffect(() => {
     if (status.toLowerCase() !== "qr_ready" || !enabled) return;
@@ -226,9 +243,15 @@ export function OpenWaQrPanel({
           method: "POST",
           body: JSON.stringify({ action: "register-webhook", ...payload }),
         });
-        setWebhookRegistered(data.ok);
-        if (data.webhookUrl) setWebhookUrl(data.webhookUrl);
+      setWebhookRegistered(data.ok);
+      if (data.webhookUrl) setWebhookUrl(data.webhookUrl);
+      if (data.ok) {
         setNotice(data.message);
+        setError("");
+      } else {
+        setError(data.message);
+        setNotice("El sondeo de bandeja sigue activo aunque el webhook falle.");
+      }
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo registrar el webhook");
@@ -300,8 +323,8 @@ export function OpenWaQrPanel({
         <div className="rounded-lg border border-outline-variant bg-surface-container-lowest p-3 space-y-2">
           <p className="text-body-sm font-medium text-on-surface">Respuestas de donantes (agendamiento)</p>
           <p className="text-body-xs text-secondary">
-            Al responder «Sí», la app consulta la bandeja de OpenWA cada 15 s (mientras esta página esté abierta)
-            y también vía webhook si está registrado.
+            Las respuestas «Sí» se procesan por <strong>sondeo automático</strong> cada 20 s (con esta página abierta).
+            El webhook es opcional; OpenWA puede bloquearlo por SSRF en redes Docker.
           </p>
           {webhookUrl ? (
             <p className="text-body-xs font-mono text-secondary break-all">URL: {webhookUrl}</p>

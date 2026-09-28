@@ -8,10 +8,11 @@ import {
   resolveOpenWaWebhookSecret,
   resolveOpenWaWebhookUrl,
 } from "@/lib/settings";
+import { resolveOpenWaWebhookRegisterCandidates } from "@/lib/openwa-webhook-url";
 import {
   ensureOpenWaQr,
   getOpenWaSessionStatus,
-  registerOpenWaWebhook,
+  registerOpenWaWebhookWithFallback,
   sendOpenWaMessage,
   startOpenWaSession,
   testOpenWaConnection,
@@ -90,6 +91,9 @@ function friendlyOpenWaError(message: string) {
   if (/ECONNREFUSED|fetch failed/i.test(message)) {
     return "No se pudo conectar con OpenWA. Verifique que el servicio esté activo en la URL configurada.";
   }
+  if (/destination address is not allowed|ssrf/i.test(message)) {
+    return message;
+  }
   return message;
 }
 
@@ -154,18 +158,17 @@ export async function POST(request: Request) {
             "Configure OPENWA_WEBHOOK_SECRET en .env (mínimo 16 caracteres) para recibir respuestas de donantes.",
         };
       }
-      const webhookUrl = resolveOpenWaWebhookUrl();
       try {
-        await registerOpenWaWebhook({
+        const { webhookUrl } = await registerOpenWaWebhookWithFallback({
           ...opts,
           sessionId: sessionUuid,
-          webhookUrl,
           secret: webhookSecret,
         });
-        return { webhookRegistered: true as const };
+        return { webhookRegistered: true as const, webhookUrl };
       } catch (err) {
         return {
           webhookRegistered: false,
+          webhookUrl: resolveOpenWaWebhookUrl(),
           webhookWarning:
             err instanceof Error ? err.message : "No se pudo registrar el webhook de WhatsApp",
         };
@@ -207,15 +210,23 @@ export async function POST(request: Request) {
     if (body.action === "status") {
       const status = await getOpenWaSessionStatus(opts);
       const sentToday = await import("@/lib/whatsapp-limit").then((m) => m.getWhatsappSentTodayCount());
-      let webhookRegistered: boolean | undefined;
-      let webhookWarning: string | undefined;
+      const webhookCandidates = resolveOpenWaWebhookRegisterCandidates();
       const webhookUrl = resolveOpenWaWebhookUrl();
-      let inboxPoll = { processed: 0, skipped: 0 };
+      let webhookRegistered: boolean | undefined;
       if (status.status.toLowerCase() === "ready") {
-        const webhook = await ensureWebhookRegistered(status.sessionUuid);
-        webhookRegistered = webhook.webhookRegistered;
-        webhookWarning = webhook.webhookWarning;
-        inboxPoll = await pollOpenWaInbox(settings);
+        const base = opts.baseUrl.replace(/\/$/, "");
+        const list = await fetch(
+          `${base}/api/sessions/${encodeURIComponent(status.sessionUuid)}/webhooks`,
+          { headers: { "X-API-Key": opts.apiKey } },
+        )
+          .then((r) => r.json().catch(() => []))
+          .catch(() => []);
+        webhookRegistered =
+          Array.isArray(list) &&
+          list.some(
+            (hook: { url?: string; active?: boolean }) =>
+              Boolean(hook.url && webhookCandidates.includes(hook.url) && hook.active !== false),
+          );
       }
       return NextResponse.json({
         status: status.status,
@@ -227,8 +238,7 @@ export async function POST(request: Request) {
         limit,
         webhookUrl,
         webhookRegistered,
-        webhookWarning,
-        inboxPoll,
+        inboxPollingEnabled: status.status.toLowerCase() === "ready",
       });
     }
 
@@ -245,10 +255,11 @@ export async function POST(request: Request) {
       const webhook = await ensureWebhookRegistered(status.sessionUuid);
       return NextResponse.json({
         ok: webhook.webhookRegistered,
-        webhookUrl: resolveOpenWaWebhookUrl(),
+        webhookUrl: webhook.webhookUrl ?? resolveOpenWaWebhookUrl(),
         message: webhook.webhookRegistered
-          ? "Webhook registrado. Las respuestas «Sí» activarán el agendamiento."
+          ? `Webhook registrado (${webhook.webhookUrl ?? resolveOpenWaWebhookUrl()}). Las respuestas «Sí» activarán el agendamiento.`
           : webhook.webhookWarning ?? "No se pudo registrar el webhook",
+        inboxFallback: !webhook.webhookRegistered,
       });
     }
 

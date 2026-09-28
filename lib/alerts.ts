@@ -16,6 +16,21 @@ export async function alertSuccess(title: string, text?: string) {
   return Swal.fire({ ...baseConfig, icon: "success", title, text, confirmButtonText: "Aceptar" });
 }
 
+/** Toast breve que se cierra solo (p. ej. tras login). */
+export async function toastSuccess(title: string, text?: string) {
+  return Swal.fire({
+    ...baseConfig,
+    icon: "success",
+    title,
+    text,
+    toast: true,
+    position: "top-end",
+    showConfirmButton: false,
+    timer: 1800,
+    timerProgressBar: true,
+  });
+}
+
 export async function alertError(title: string, text?: string) {
   return Swal.fire({ ...baseConfig, icon: "error", title, text, confirmButtonText: "Entendido" });
 }

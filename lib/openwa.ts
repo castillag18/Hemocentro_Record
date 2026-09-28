@@ -6,6 +6,7 @@ import {
   resolveOpenWaSessionUuid,
   type OpenWaSessionSummary,
 } from "./openwa-session";
+import { resolveOpenWaWebhookRegisterCandidates } from "./openwa-webhook-url";
 import {
   openWaConfigured,
   sendOpenWaMessage,
@@ -219,9 +220,39 @@ export async function registerOpenWaWebhook(options: {
   });
   const data = (await res.json().catch(() => ({}))) as { message?: string; error?: string };
   if (!res.ok) {
-    throw new Error(data.message ?? data.error ?? "No se pudo registrar el webhook");
+    const raw = data.message ?? data.error ?? "No se pudo registrar el webhook";
+    if (/destination address is not allowed|ssrf|not allowed/i.test(raw)) {
+      throw new Error(
+        "OpenWA bloqueó la URL del webhook (política SSRF). El agendamiento por «Sí» funciona igual vía sondeo automático de bandeja. Opcional: en OpenWA configure SSRF_ALLOWED_HOSTS=host.docker.internal,172.17.0.1 y OPENWA_WEBHOOK_URL=http://host.docker.internal:3000/api/webhooks/openwa",
+      );
+    }
+    throw new Error(raw);
   }
   return data;
+}
+
+export async function registerOpenWaWebhookWithFallback(options: {
+  baseUrl: string;
+  apiKey: string;
+  sessionId: string;
+  secret: string;
+}) {
+  const candidates = resolveOpenWaWebhookRegisterCandidates();
+  let lastError: Error | null = null;
+
+  for (const webhookUrl of candidates) {
+    try {
+      const result = await registerOpenWaWebhook({ ...options, webhookUrl });
+      return { webhookUrl, result };
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (!/destination address is not allowed|ssrf|not allowed/i.test(lastError.message)) {
+        throw lastError;
+      }
+    }
+  }
+
+  throw lastError ?? new Error("No se pudo registrar el webhook con ninguna URL candidata");
 }
 
 export {

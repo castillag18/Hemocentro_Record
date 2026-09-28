@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/client";
 import { loginSchema } from "@/lib/validation/schemas";
-import { alertError, alertSuccess, alertInfo, showLoading, closeLoading } from "@/lib/alerts";
+import { alertError, alertInfo, showLoading, closeLoading, toastSuccess } from "@/lib/alerts";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import { Spinner } from "@/components/Spinner";
@@ -36,7 +36,7 @@ function LoginForm() {
         body: JSON.stringify({ code }),
       });
       closeLoading();
-      await alertSuccess("Bienvenido", "Sesión iniciada con Google correctamente");
+      void toastSuccess("Bienvenido", "Sesión iniciada con Google");
       router.replace("/");
       router.refresh();
     } catch (err) {
@@ -77,7 +77,7 @@ function LoginForm() {
         body: JSON.stringify(parsed.data),
       });
       closeLoading();
-      await alertSuccess("Bienvenido", "Sesión iniciada correctamente");
+      void toastSuccess("Bienvenido", "Sesión iniciada correctamente");
       router.replace("/");
       router.refresh();
     } catch (err) {

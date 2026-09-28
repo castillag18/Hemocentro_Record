@@ -24,28 +24,7 @@ export function resolveOpenWaWebhookSecret(stored?: string | null) {
   return process.env.OPENWA_WEBHOOK_SECRET?.trim() || stored?.trim() || "";
 }
 
-/** URL del webhook tal como OpenWA debe llamarla (desde su contenedor/proceso). */
-export function resolveOpenWaWebhookUrl() {
-  const explicit = process.env.OPENWA_WEBHOOK_URL?.trim();
-  if (explicit) return explicit;
-
-  const port = process.env.PORT?.trim() || "3000";
-  const path = "/api/webhooks/openwa";
-  const openWaUrl = (process.env.WHATSAPP_OPENWA_URL || "http://localhost:2785").toLowerCase();
-  const openWaOnLocalHost =
-    openWaUrl.includes("localhost:2785") || openWaUrl.includes("127.0.0.1:2785");
-
-  if (openWaOnLocalHost) {
-    if (process.platform === "win32" || process.platform === "darwin") {
-      return `http://host.docker.internal:${port}${path}`;
-    }
-    // Linux + Docker: puente docker0 hacia la app en el host (0.0.0.0:3000)
-    return `http://172.17.0.1:${port}${path}`;
-  }
-
-  const base = (process.env.NEXT_PUBLIC_APP_URL || `http://localhost:${port}`).replace(/\/$/, "");
-  return `${base}${path}`;
-}
+export { resolveOpenWaWebhookUrl } from "./openwa-webhook-url";
 
 function resolveGoogleCalendarId(stored?: string | null) {
   return process.env.GOOGLE_CALENDAR_ID?.trim() || stored?.trim() || "primary";
