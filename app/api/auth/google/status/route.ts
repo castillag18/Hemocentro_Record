@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { usesSecureCookies } from "@/lib/cookie-secure";
+import { agentDebugLog } from "@/lib/debug-log";
 import {
   getGoogleJavascriptOrigin,
   getGoogleRedirectUri,
@@ -8,10 +10,26 @@ import {
 
 export async function GET() {
   const configured = await googleOAuthConfigured();
-  return NextResponse.json({
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() ?? "";
+  const redirectUri = getGoogleRedirectUri();
+  const payload = {
     configured,
     fromEnv: googleOAuthEnvConfigured(),
-    redirectUri: getGoogleRedirectUri(),
+    redirectUri,
     javascriptOrigin: getGoogleJavascriptOrigin(),
+    appUrl,
+    cookieSecure: usesSecureCookies(),
+    redirectMatchesAppUrl: appUrl
+      ? redirectUri.startsWith(appUrl.replace(/\/$/, ""))
+      : null,
+  };
+  // #region agent log
+  agentDebugLog({
+    location: "google/status",
+    message: "OAuth status check",
+    data: payload,
+    hypothesisId: "H1",
   });
+  // #endregion
+  return NextResponse.json(payload);
 }

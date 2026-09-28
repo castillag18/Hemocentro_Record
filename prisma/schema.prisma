@@ -67,8 +67,10 @@ model Settings {
   whatsappDailyLimit      Int       @default(1000)
   autoRemindersEnabled    Boolean   @default(false)
   autoRemindersHour       Int       @default(8)
-  autoBirthdayEnabled     Boolean   @default(false)
-  autoSpecialDatesEnabled Boolean   @default(false)
+  autoBirthdayEnabled            Boolean   @default(false)
+  autoSpecialDatesEnabled        Boolean   @default(false)
+  autoSatisfactionSurveyEnabled  Boolean   @default(false)
+  autoSatisfactionSurveyHour     Int       @default(18)
   specialDatesJson        String?   @db.Text
   googleCalendarId        String    @default("")
   googleCredentialsJson   String?   @db.Text

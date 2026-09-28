@@ -147,9 +147,14 @@ export default function ConfiguracionPage() {
 
   async function connectGoogleCalendar() {
     try {
-      const status = await api<{ configured: boolean; redirectUri: string; javascriptOrigin: string }>(
-        "/api/auth/google/status",
-      );
+      const status = await api<{
+        configured: boolean;
+        redirectUri: string;
+        javascriptOrigin: string;
+        appUrl: string;
+        cookieSecure: boolean;
+        redirectMatchesAppUrl: boolean | null;
+      }>("/api/auth/google/status");
       if (!status.configured) {
         void alertInfo(
           "Google OAuth no configurado",
@@ -157,9 +162,42 @@ export default function ConfiguracionPage() {
         );
         return;
       }
+      const browserOrigin =
+        typeof window !== "undefined" ? window.location.origin.replace(/\/$/, "") : "";
+      if (browserOrigin && status.javascriptOrigin !== browserOrigin) {
+        void alertInfo(
+          "URL del servidor no coincide",
+          `Está abriendo la app en:\n${browserOrigin}\n\nPero el .env del servidor tiene:\nNEXT_PUBLIC_APP_URL=${status.appUrl}\nGOOGLE_REDIRECT_URI=${status.redirectUri}\n\nCorrija el .env (use la IP de la VM, ej. http://192.168.1.112:3000), reinicie la app y registre la misma URI en Google Cloud Console.`,
+        );
+        return;
+      }
+      if (status.redirectMatchesAppUrl === false) {
+        void alertInfo(
+          "Redirect URI inconsistente",
+          `GOOGLE_REDIRECT_URI no coincide con NEXT_PUBLIC_APP_URL.\n\nRedirect: ${status.redirectUri}\nApp: ${status.appUrl}`,
+        );
+        return;
+      }
       window.location.href = "/api/auth/google?mode=calendar";
     } catch (err) {
       void alertError("Error", err instanceof Error ? err.message : "No se pudo iniciar conexión");
+    }
+  }
+
+  async function syncGoogleCalendar() {
+    showLoading("Sincronizando citas con Google Calendar...");
+    try {
+      const result = await api<{ synced: number; failed: number }>("/api/google-calendar/sync", {
+        method: "POST",
+      });
+      void alertSuccess(
+        "Sincronización completada",
+        `${result.synced} cita(s) sincronizada(s)${result.failed ? `, ${result.failed} fallida(s)` : ""}.`,
+      );
+    } catch (err) {
+      void alertError("Error", err instanceof Error ? err.message : "No se pudo sincronizar");
+    } finally {
+      closeLoading();
     }
   }
 
@@ -413,7 +451,7 @@ export default function ConfiguracionPage() {
                       </p>
                     </div>
                   ) : form.hasGoogleCredentials || form.hasGoogleOAuth ? (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <p className="text-body-md text-tertiary-container flex items-center gap-2">
                         <Icon name="check_circle" className="text-tertiary" />
                         Google Calendar conectado
@@ -429,6 +467,14 @@ export default function ConfiguracionPage() {
                         onChange={(v) => set("googleCalendarId", v)}
                         className="mt-2"
                       />
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" onClick={() => void syncGoogleCalendar()}>
+                          <Icon name="refresh" /> Sincronizar citas pendientes
+                        </Button>
+                        <Button variant="outline" onClick={() => void connectGoogleCalendar()}>
+                          <Icon name="account_circle" /> Reconectar cuenta
+                        </Button>
+                      </div>
                     </div>
                   ) : (
                     <>

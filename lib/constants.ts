@@ -32,13 +32,14 @@ export const GENDER_LABELS: Record<Gender, string> = {
 
 export const SESSION_COOKIE = "hemocentro_session";
 
-export const TEMPLATE_KINDS = ["reminder", "birthday", "special"] as const;
+export const TEMPLATE_KINDS = ["reminder", "birthday", "special", "satisfaction"] as const;
 export type TemplateKind = (typeof TEMPLATE_KINDS)[number];
 
 export const TEMPLATE_KIND_LABELS: Record<TemplateKind, string> = {
   reminder: "Recordatorio de donación",
   birthday: "Felicitación de cumpleaños",
   special: "Fecha especial",
+  satisfaction: "Encuesta de satisfacción",
 };
 
 export const TEMPLATE_VARIABLES = [
@@ -106,6 +107,29 @@ Hoy conmemoramos *{special_date_name}* y queremos recordarte lo valioso que es t
 *Tu sangre salva vidas.* 🩸`;
 
 export const DEFAULT_SPECIAL_EMAIL_SUBJECT = "{special_date_name} — HUAV Banco de Sangre";
+
+export const DEFAULT_SATISFACTION_WHATSAPP_BODY = `¡Hola, *{donor_name}*! 🩸
+
+Gracias por donar hoy en *HUAV Banco de Sangre*. Su generosidad salva vidas. ❤️
+
+¿Cómo calificaría su experiencia hoy?
+Responda con un número del *1* (muy mala) al *5* (excelente).
+
+Su opinión nos ayuda a mejorar. ¡Gracias!`;
+
+export const DEFAULT_SATISFACTION_EMAIL_SUBJECT =
+  "¿Cómo fue su experiencia de donación? — HUAV Banco de Sangre";
+
+export const DEFAULT_SATISFACTION_EMAIL_BODY = `<div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111c2d;">
+  <div style="background:#c8102e;padding:24px;text-align:center;">
+    <h1 style="color:#ffffff;margin:0;font-size:22px;">Encuesta de satisfacción</h1>
+  </div>
+  <div style="padding:24px;background:#ffffff;">
+    <p>Hola <strong>{donor_name}</strong>,</p>
+    <p>Gracias por donar hoy en <strong>HUAV Banco de Sangre</strong>. ¿Cómo calificaría su experiencia del 1 (muy mala) al 5 (excelente)?</p>
+    <p style="font-size:12px;color:#5c5f61;">Responda a este correo con su calificación.</p>
+  </div>
+</div>`;
 
 export const DEFAULT_SPECIAL_EMAIL_BODY = `<div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111c2d;">
   <div style="background:#c8102e;padding:24px;text-align:center;">

@@ -26,6 +26,8 @@ type Template = {
 type MessagingConfig = {
   autoBirthdayEnabled: boolean;
   autoSpecialDatesEnabled: boolean;
+  autoSatisfactionSurveyEnabled: boolean;
+  autoSatisfactionSurveyHour: number;
   specialDates: SpecialDateEntry[];
 };
 
@@ -54,6 +56,14 @@ const SAMPLE: Record<TemplateKind, Record<string, string>> = {
     appointment_link: "https://hemocentro.local/citas",
     special_date_name: "Día Mundial del Donante de Sangre",
   },
+  satisfaction: {
+    donor_name: "Ana García",
+    last_donation_date: "27/09/2026",
+    next_donation_date: "27/12/2026",
+    blood_type: "O+",
+    appointment_link: "https://hemocentro.local/citas",
+    special_date_name: "",
+  },
 };
 
 export default function MensajeriaPage() {
@@ -64,6 +74,8 @@ export default function MensajeriaPage() {
   const [messaging, setMessaging] = useState<MessagingConfig>({
     autoBirthdayEnabled: false,
     autoSpecialDatesEnabled: false,
+    autoSatisfactionSurveyEnabled: false,
+    autoSatisfactionSurveyHour: 18,
     specialDates: [],
   });
   const [notice, setNotice] = useState("");
@@ -245,7 +257,7 @@ export default function MensajeriaPage() {
             </div>
           </div>
 
-          {(kind === "birthday" || kind === "special") && (
+          {(kind === "birthday" || kind === "special" || kind === "satisfaction") && (
             <div className="bg-white rounded-xl p-md shadow-level-1 border border-outline-variant/30 space-y-md">
               <div className="flex items-center gap-2">
                 <Icon name="schedule_send" className="text-primary" />
@@ -264,6 +276,47 @@ export default function MensajeriaPage() {
                     Enviar felicitación automática el día del cumpleaños del donante
                   </span>
                 </label>
+              ) : kind === "satisfaction" ? (
+                <>
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={messaging.autoSatisfactionSurveyEnabled}
+                      onChange={(e) =>
+                        setMessaging((prev) => ({
+                          ...prev,
+                          autoSatisfactionSurveyEnabled: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span className="text-body-md">
+                      Enviar encuesta automática por WhatsApp cuando la donación quede registrada en
+                      HUAV el mismo día de la cita
+                    </span>
+                  </label>
+                  <div>
+                    <label className="block text-label-md text-secondary uppercase mb-2">
+                      Hora diaria de envío (0-23)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={23}
+                      className="w-full max-w-xs border border-outline-variant rounded-lg p-2"
+                      value={messaging.autoSatisfactionSurveyHour}
+                      onChange={(e) =>
+                        setMessaging((prev) => ({
+                          ...prev,
+                          autoSatisfactionSurveyHour: Number(e.target.value) || 18,
+                        }))
+                      }
+                    />
+                    <p className="text-body-sm text-secondary mt-1">
+                      Verifica en la base HUAV que exista donación el día de la cita antes de enviar.
+                      Requiere WhatsApp conectado y variables HUAV_DB_* en el .env.
+                    </p>
+                  </div>
+                </>
               ) : (
                 <>
                   <label className="flex items-center gap-3">
@@ -334,15 +387,17 @@ export default function MensajeriaPage() {
                   </div>
                 </>
               )}
-              {kind === "birthday" ? (
+              {kind === "birthday" || kind === "satisfaction" ? (
                 <Button onClick={() => void saveMessaging()} disabled={saving}>
                   Guardar envío automático
                 </Button>
               ) : null}
-              <p className="text-body-sm text-secondary">
-                Los mensajes automáticos usan la misma hora configurada en Configuración → Envío
-                automático de recordatorios.
-              </p>
+              {kind !== "satisfaction" ? (
+                <p className="text-body-sm text-secondary">
+                  Los mensajes automáticos usan la misma hora configurada en Configuración → Envío
+                  automático de recordatorios.
+                </p>
+              ) : null}
             </div>
           )}
 

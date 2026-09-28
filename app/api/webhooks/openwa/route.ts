@@ -77,7 +77,21 @@ async function confirmAppointment(options: {
   };
   let calendarError: string | null = null;
 
-  if (googleCalendarConfigured(options.settings)) {
+  const calendarConfigured = googleCalendarConfigured(options.settings);
+  // #region agent log
+  const { agentDebugLog } = await import("@/lib/debug-log");
+  agentDebugLog({
+    location: "openwa:confirmAppointment",
+    message: "Confirm appointment calendar check",
+    data: {
+      calendarConfigured,
+      donorId: options.donor.id,
+      scheduledAt: options.scheduledAt.toISOString(),
+    },
+    hypothesisId: "H4",
+  });
+  // #endregion
+  if (calendarConfigured) {
     try {
       appointment = await createDonorAppointment({
         settings: options.settings,
@@ -88,6 +102,14 @@ async function confirmAppointment(options: {
       });
     } catch (error) {
       calendarError = error instanceof Error ? error.message : "Error al crear evento en Google Calendar";
+      // #region agent log
+      agentDebugLog({
+        location: "openwa:confirmAppointment",
+        message: "Calendar event creation failed",
+        data: { calendarError },
+        hypothesisId: "H5",
+      });
+      // #endregion
       appointment = {
         scheduledAt: options.scheduledAt,
         googleEventId: null,

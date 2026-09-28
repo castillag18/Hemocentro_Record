@@ -5,6 +5,9 @@ import {
   DEFAULT_BIRTHDAY_WHATSAPP_BODY,
   DEFAULT_EMAIL_BODY,
   DEFAULT_EMAIL_SUBJECT,
+  DEFAULT_SATISFACTION_EMAIL_BODY,
+  DEFAULT_SATISFACTION_EMAIL_SUBJECT,
+  DEFAULT_SATISFACTION_WHATSAPP_BODY,
   DEFAULT_SPECIAL_EMAIL_BODY,
   DEFAULT_SPECIAL_EMAIL_SUBJECT,
   DEFAULT_SPECIAL_WHATSAPP_BODY,
@@ -51,6 +54,18 @@ const DEFAULTS: Record<
       name: "Fecha especial - Correo",
       subject: DEFAULT_SPECIAL_EMAIL_SUBJECT,
       body: DEFAULT_SPECIAL_EMAIL_BODY,
+    },
+  },
+  satisfaction: {
+    whatsapp: {
+      name: "Encuesta de satisfacción - WhatsApp",
+      subject: "",
+      body: DEFAULT_SATISFACTION_WHATSAPP_BODY,
+    },
+    email: {
+      name: "Encuesta de satisfacción - Correo",
+      subject: DEFAULT_SATISFACTION_EMAIL_SUBJECT,
+      body: DEFAULT_SATISFACTION_EMAIL_BODY,
     },
   },
 };

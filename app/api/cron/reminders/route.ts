@@ -9,6 +9,7 @@ import {
 import { getAutoReminderDonors } from "@/lib/eligibility";
 import { getSettings } from "@/lib/settings";
 import { sendRemindersToDonors } from "@/lib/send-reminders";
+import { getSatisfactionSurveyCandidates } from "@/lib/satisfaction-survey";
 
 export async function POST(request: Request) {
   const secret = request.headers.get("x-cron-secret");
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
     donation: null as Record<string, unknown> | null,
     birthday: null as Record<string, unknown> | null,
     special: [] as Record<string, unknown>[],
+    satisfaction: null as Record<string, unknown> | null,
   };
 
   if (settings.autoRemindersEnabled && withinHour) {
@@ -90,8 +92,47 @@ export async function POST(request: Request) {
     (summary.skipped as string[]).push("Mensajes de fechas especiales desactivados");
   }
 
+  const satisfactionHour = settings.autoSatisfactionSurveyHour ?? 18;
+  const withinSatisfactionHour = force || hour === satisfactionHour;
+
+  if (settings.autoSatisfactionSurveyEnabled && withinSatisfactionHour) {
+    const candidates = await getSatisfactionSurveyCandidates(today);
+    if (candidates.length) {
+      let sent = 0;
+      let failed = 0;
+      for (const candidate of candidates) {
+        const result = await sendRemindersToDonors({
+          donors: [candidate.donor],
+          channels: ["whatsapp"],
+          explicitChannel: true,
+          templateKind: "satisfaction",
+          referenceKey: candidate.referenceKey,
+        });
+        sent += result.whatsappOpenWa.sent + result.whatsappApi.sent;
+        failed +=
+          result.whatsappOpenWa.failed.length +
+          result.whatsappApi.failed.length +
+          (result.whatsapp.length ? 1 : 0);
+      }
+      summary.satisfaction = { eligible: candidates.length, sent, failed };
+    } else {
+      (summary.skipped as string[]).push(
+        "Sin encuestas de satisfacción pendientes (cita hoy + donación registrada en HUAV)",
+      );
+    }
+  } else if (!settings.autoSatisfactionSurveyEnabled) {
+    (summary.skipped as string[]).push("Encuestas de satisfacción desactivadas");
+  } else if (!withinSatisfactionHour) {
+    (summary.skipped as string[]).push(
+      `Fuera de hora de encuesta de satisfacción (${satisfactionHour}:00)`,
+    );
+  }
+
   const hasWork =
-    summary.donation || summary.birthday || (summary.special as unknown[]).length > 0;
+    summary.donation ||
+    summary.birthday ||
+    (summary.special as unknown[]).length > 0 ||
+    summary.satisfaction;
 
   if (!hasWork && (summary.skipped as string[]).length) {
     return NextResponse.json({ skipped: true, ...summary });

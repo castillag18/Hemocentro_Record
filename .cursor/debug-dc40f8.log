@@ -1,0 +1,1 @@
+{"sessionId":"dc40f8","timestamp":1790554280377,"location":"google/status","message":"OAuth status check","data":{"configured":true,"fromEnv":true,"redirectUri":"http://192.168.1.4:3000/api/auth/google/callback","javascriptOrigin":"http://192.168.1.4:3000","appUrl":"http://192.168.1.4:3000","cookieSecure":false,"redirectMatchesAppUrl":true},"hypothesisId":"H1"}

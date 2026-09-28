@@ -28,7 +28,7 @@ const SATURDAY_SLOTS: SlotTime[] = [
   { hour: 11, minute: 0 },
 ];
 
-function bogotaDateParts(date: Date) {
+export function bogotaDateParts(date: Date) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: HEMOCENTRO_TZ,
     year: "numeric",

@@ -47,6 +47,8 @@ export async function GET() {
       messaging: {
         autoBirthdayEnabled: settings.autoBirthdayEnabled ?? false,
         autoSpecialDatesEnabled: settings.autoSpecialDatesEnabled ?? false,
+        autoSatisfactionSurveyEnabled: settings.autoSatisfactionSurveyEnabled ?? false,
+        autoSatisfactionSurveyHour: settings.autoSatisfactionSurveyHour ?? 18,
         specialDates,
       },
     });
@@ -69,6 +71,8 @@ export async function PUT(request: Request) {
     messaging?: {
       autoBirthdayEnabled?: boolean;
       autoSpecialDatesEnabled?: boolean;
+      autoSatisfactionSurveyEnabled?: boolean;
+      autoSatisfactionSurveyHour?: number;
       specialDates?: SpecialDateEntry[];
     };
   } | null;
@@ -81,6 +85,8 @@ export async function PUT(request: Request) {
         data: {
           autoBirthdayEnabled: Boolean(body.messaging.autoBirthdayEnabled),
           autoSpecialDatesEnabled: Boolean(body.messaging.autoSpecialDatesEnabled),
+          autoSatisfactionSurveyEnabled: Boolean(body.messaging.autoSatisfactionSurveyEnabled),
+          autoSatisfactionSurveyHour: Number(body.messaging.autoSatisfactionSurveyHour ?? 18),
           ...(specialDates ? { specialDatesJson: JSON.stringify(specialDates) } : {}),
         },
       });
@@ -101,6 +107,8 @@ export async function PUT(request: Request) {
           messaging: {
             autoBirthdayEnabled: settings.autoBirthdayEnabled ?? false,
             autoSpecialDatesEnabled: settings.autoSpecialDatesEnabled ?? false,
+            autoSatisfactionSurveyEnabled: settings.autoSatisfactionSurveyEnabled ?? false,
+            autoSatisfactionSurveyHour: settings.autoSatisfactionSurveyHour ?? 18,
             specialDates,
           },
         });
