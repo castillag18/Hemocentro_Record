@@ -223,14 +223,20 @@ export async function sendOpenWaTextMessage(
   const base = ctx.baseUrl.replace(/\/$/, "");
 
   if (ctx.replyToMessageId && ctx.chatId) {
-    return sendOpenWaReplyMessage({
-      baseUrl: ctx.baseUrl,
-      apiKey: ctx.apiKey,
-      sessionId: ctx.sessionId,
-      chatId,
-      quotedMessageId: ctx.replyToMessageId,
-      text: ctx.text,
-    });
+    try {
+      return await sendOpenWaReplyMessage({
+        baseUrl: ctx.baseUrl,
+        apiKey: ctx.apiKey,
+        sessionId: ctx.sessionId,
+        chatId,
+        quotedMessageId: ctx.replyToMessageId,
+        text: ctx.text,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // IDs de mensajes antiguos en la bandeja ya no existen en OpenWA para reply.
+      if (!/message .* not found|not found/i.test(msg)) throw err;
+    }
   }
 
   const res = await fetch(`${base}/api/sessions/${encodeURIComponent(sessionUuid)}/messages/send-text`, {

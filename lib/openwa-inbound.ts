@@ -400,17 +400,30 @@ export async function processOpenWaInboundMessage(
       });
     }
     if (isAffirmativeReply(body) && slots.length) {
-      await notifyDonorWhatsApp(settings, {
-        donorId: donor.id,
-        phone: donor.phone,
-        chatId: replyChatId,
-        replyToMessageId,
-        message: buildSlotSelectionMessage({
-          donorName: donor.name,
-          siteName: settings.siteName,
-          slots,
-        }),
-      });
+      try {
+        await notifyDonorWhatsApp(settings, {
+          donorId: donor.id,
+          phone: donor.phone,
+          chatId: replyChatId,
+          replyToMessageId,
+          message: buildSlotSelectionMessage({
+            donorName: donor.name,
+            siteName: settings.siteName,
+            slots,
+          }),
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Error al reenviar fechas";
+        return {
+          ok: true,
+          step: "awaiting_slot_selection",
+          donorId: donor.id,
+          options: slots.length,
+          resent: true,
+          deliveryFailed: true,
+          error: msg,
+        };
+      }
       return {
         ok: true,
         step: "awaiting_slot_selection",

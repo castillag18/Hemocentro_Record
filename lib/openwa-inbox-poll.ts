@@ -68,6 +68,7 @@ export async function pollOpenWaInbox(settingsInput?: Awaited<ReturnType<typeof 
 
   let processed = 0;
   let skipped = 0;
+  const errors: string[] = [];
   const results: Awaited<ReturnType<typeof processOpenWaInboundMessage>>[] = [];
 
   try {
@@ -89,13 +90,22 @@ export async function pollOpenWaInbox(settingsInput?: Awaited<ReturnType<typeof 
 
       const chatId = message.chatId ?? "";
       const from = chatId.includes("@") ? chatId : chatId;
-      const result = await processOpenWaInboundMessage(settings, {
-        from,
-        chatId: from,
-        body: String(message.body).trim(),
-        messageId,
-        source: "poll",
-      });
+      let result: Awaited<ReturnType<typeof processOpenWaInboundMessage>>;
+      try {
+        result = await processOpenWaInboundMessage(settings, {
+          from,
+          chatId: from,
+          body: String(message.body).trim(),
+          messageId,
+          source: "poll",
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Error al procesar mensaje";
+        errors.push(`${messageId}: ${msg}`);
+        await markMessageProcessed(messageId, "poll-error");
+        skipped += 1;
+        continue;
+      }
 
       const actionable =
         Boolean((result as { ok?: boolean }).ok) ||
@@ -118,7 +128,12 @@ export async function pollOpenWaInbox(settingsInput?: Awaited<ReturnType<typeof 
       });
     }
 
-    return { processed, skipped, results };
+    return {
+      processed,
+      skipped,
+      results,
+      ...(errors.length ? { warnings: errors } : {}),
+    };
   } catch (err) {
     const error = err instanceof Error ? err.message : "Error al consultar bandeja OpenWA";
     agentDebugLog({

@@ -11,7 +11,11 @@ async function main() {
   console.log(JSON.stringify(result, null, 2));
   if (result.error) {
     console.error("error:", result.error);
-    process.exit(1);
+    const fatal = /no configurado|database|ECONNREFUSED|connect/i.test(result.error);
+    if (fatal) process.exit(1);
+  }
+  if (result.warnings?.length) {
+    console.error("warnings:", result.warnings.join("; "));
   }
 }
 
