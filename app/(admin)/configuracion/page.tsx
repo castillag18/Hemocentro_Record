@@ -7,6 +7,7 @@ import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import { Spinner } from "@/components/Spinner";
 import { DatabaseUploadPanel } from "@/components/DatabaseUploadPanel";
+import { HuavImportPanel } from "@/components/HuavImportPanel";
 import { OpenWaQrPanel } from "@/components/OpenWaQrPanel";
 
 type Settings = {
@@ -58,6 +59,8 @@ export default function ConfiguracionPage() {
   const [tab, setTab] = useState<"general" | "canales" | "datos">("general");
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
+  const [oauthPaste, setOauthPaste] = useState("");
+  const [oauthConnecting, setOauthConnecting] = useState(false);
 
   useEffect(() => {
     void api<Settings>("/api/settings")
@@ -169,9 +172,52 @@ export default function ConfiguracionPage() {
         );
         return;
       }
-      window.location.href = "/api/auth/google?mode=calendar";
+      void alertInfo(
+        "Después de autorizar en Google",
+        "Si el navegador muestra localhost con error, NO cierre la pestaña: copie la URL completa de la barra y péguela abajo en «Completar conexión con URL copiada» (válida ~1 min).",
+      );
+      window.setTimeout(() => {
+        window.location.href = "/api/auth/google?mode=calendar";
+      }, 800);
     } catch (err) {
       void alertError("Error", err instanceof Error ? err.message : "No se pudo iniciar conexión");
+    }
+  }
+
+  async function completeGoogleOAuthPaste() {
+    if (!oauthPaste.trim()) {
+      void alertInfo("Pegue la URL", "Copie la URL completa de la barra del navegador después de autorizar en Google.");
+      return;
+    }
+    setOauthConnecting(true);
+    showLoading("Completando conexión con Google Calendar...");
+    try {
+      const result = await api<{ email: string; synced: number; failed: number }>(
+        "/api/google-calendar/connect",
+        {
+          method: "POST",
+          body: JSON.stringify({ code: oauthPaste.trim() }),
+        },
+      );
+      setOauthPaste("");
+      const loaded = await api<Settings>("/api/settings");
+      setForm({
+        ...loaded,
+        whatsappMode: loaded.whatsappMode === "wame" ? "openwa" : loaded.whatsappMode,
+        femaleWholeBloodMonths: loaded.femaleWholeBloodMonths ?? 4,
+        femaleApheresisMonths: loaded.femaleApheresisMonths ?? 1,
+        maleWholeBloodMonths: loaded.maleWholeBloodMonths ?? 3,
+        maleApheresisMonths: loaded.maleApheresisMonths ?? 1,
+      });
+      void alertSuccess(
+        "Google Calendar conectado",
+        `${result.email} vinculado. ${result.synced} cita(s) sincronizada(s).`,
+      );
+    } catch (err) {
+      void alertError("Error", err instanceof Error ? err.message : "No se pudo completar la conexión");
+    } finally {
+      setOauthConnecting(false);
+      closeLoading();
     }
   }
 
@@ -466,6 +512,24 @@ export default function ConfiguracionPage() {
                           <Icon name="account_circle" /> Reconectar cuenta
                         </Button>
                       </div>
+                      <details className="text-body-sm text-secondary">
+                        <summary className="cursor-pointer text-on-surface">Completar conexión con URL de localhost</summary>
+                        <div className="mt-2 space-y-2">
+                          <textarea
+                            className="w-full min-h-[72px] border border-secondary-container rounded p-2 font-mono text-body-xs"
+                            value={oauthPaste}
+                            onChange={(e) => setOauthPaste(e.target.value)}
+                            placeholder="Pegue la URL de callback de Google..."
+                          />
+                          <Button
+                            variant="outline"
+                            disabled={oauthConnecting || !oauthPaste.trim()}
+                            onClick={() => void completeGoogleOAuthPaste()}
+                          >
+                            Completar conexión
+                          </Button>
+                        </div>
+                      </details>
                     </div>
                   ) : (
                     <>
@@ -510,6 +574,29 @@ export default function ConfiguracionPage() {
                       <Button variant="outline" onClick={() => void connectGoogleCalendar()}>
                         <Icon name="account_circle" /> Conectar Google Calendar
                       </Button>
+                      <div className="rounded-lg border border-secondary-container bg-surface-container-low p-3 space-y-2">
+                        <p className="text-body-sm font-medium text-on-surface">
+                          ¿Quedó en localhost sin cargar? (ERR_CONNECTION_REFUSED)
+                        </p>
+                        <p className="text-body-sm text-secondary">
+                          Si Google lo redirigió a <code>localhost:3000</code> pero la app está en el
+                          servidor, copie la <strong>URL completa</strong> de la barra del navegador y
+                          péguela aquí (tiene validez ~1 minuto):
+                        </p>
+                        <textarea
+                          className="w-full min-h-[72px] border border-secondary-container rounded p-2 font-mono text-body-xs"
+                          placeholder="http://localhost:3000/api/auth/google/callback?state=...&code=..."
+                          value={oauthPaste}
+                          onChange={(e) => setOauthPaste(e.target.value)}
+                        />
+                        <Button
+                          variant="outline"
+                          disabled={oauthConnecting || !oauthPaste.trim()}
+                          onClick={() => void completeGoogleOAuthPaste()}
+                        >
+                          Completar conexión con URL copiada
+                        </Button>
+                      </div>
                       <div className="rounded-lg border border-amber-soft bg-amber-soft/40 p-3 text-body-sm text-secondary space-y-1">
                         <p className="font-medium text-on-surface">Si Google muestra «Acceso bloqueado» (403)</p>
                         <p>
@@ -649,7 +736,10 @@ export default function ConfiguracionPage() {
                 <Icon name="upload_file" className="text-primary text-[28px]" />
                 <h3 className="text-title-lg">Cargar plano de base de datos</h3>
               </div>
-              <DatabaseUploadPanel />
+              <HuavImportPanel />
+              <div className="mt-lg border-t border-secondary-container pt-lg">
+                <DatabaseUploadPanel />
+              </div>
             </section>
           ) : null}
         </div>

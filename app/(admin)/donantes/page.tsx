@@ -9,6 +9,7 @@ import { BloodTypeBadge } from "@/components/BloodTypeBadge";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import { DonorFormModal, type DonorRecord } from "@/components/DonorFormModal";
+import { HuavImportPanel } from "@/components/HuavImportPanel";
 import { ImportModal } from "@/components/ImportModal";
 import { Pagination } from "@/components/Pagination";
 import { LoadingOverlay } from "@/components/Spinner";
@@ -76,11 +77,18 @@ function DonantesContent() {
   return (
     <div>
       {initialLoading && !data ? <LoadingOverlay message="Cargando donantes..." /> : null}
+      {data && data.total <= 10 ? (
+        <div className="mb-md">
+          <HuavImportPanel onImported={() => void load()} />
+        </div>
+      ) : null}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-md mb-lg">
         <div>
           <h2 className="text-display-lg max-md:text-headline-lg">Gestión de donantes</h2>
           <p className="text-body-lg text-secondary mt-xs">
-            Consulte, registre e importe la base de donantes.
+            Consulte, registre e importe la base de donantes
+            {data ? ` (${data.total} en total)` : ""}.
           </p>
         </div>
         <div className="flex flex-wrap gap-sm">
