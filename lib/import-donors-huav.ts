@@ -103,10 +103,10 @@ function deriveDocumentId(name: string, phone: unknown, email: string, fallback:
 function loadDonantesSql() {
   const sqlPath =
     process.env.HUAV_DONORS_SQL?.trim() || path.join(process.cwd(), "donantes_info.sql");
-  if (!fs.existsSync(sqlPath)) {
+  if (!fs.existsSync(/* turbopackIgnore: true */ sqlPath)) {
     throw new Error(`No se encontró el archivo SQL: ${sqlPath}`);
   }
-  let sql = fs.readFileSync(sqlPath, "utf8").trim();
+  let sql = fs.readFileSync(/* turbopackIgnore: true */ sqlPath, "utf8").trim();
   if (!sql.endsWith(";")) sql += ";";
   sql = sql.replace(/\bLIMIT\s+\d+\b/gi, "");
   return { sql, sqlPath };

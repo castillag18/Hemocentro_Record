@@ -79,6 +79,8 @@ function baseSettings(overrides: Partial<Settings> = {}): Settings {
     autoRemindersHour: 8,
     autoBirthdayEnabled: false,
     autoSpecialDatesEnabled: false,
+    autoSatisfactionSurveyEnabled: false,
+    autoSatisfactionSurveyHour: 18,
     specialDatesJson: null,
     googleCalendarId: "primary",
     googleCredentialsJson: null,

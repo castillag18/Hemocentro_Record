@@ -14,7 +14,7 @@ async function main() {
     const fatal = /no configurado|database|ECONNREFUSED|connect/i.test(result.error);
     if (fatal) process.exit(1);
   }
-  if (result.warnings?.length) {
+  if ("warnings" in result && result.warnings?.length) {
     console.error("warnings:", result.warnings.join("; "));
   }
 }

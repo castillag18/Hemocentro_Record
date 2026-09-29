@@ -21,10 +21,6 @@ function allowedDevOrigins(): string[] {
 const nextConfig: NextConfig = {
   serverExternalPackages: ["@prisma/client", "xlsx", "nodemailer", "googleapis"],
   allowedDevOrigins: allowedDevOrigins(),
-  devIndicators: {
-    appIsrStatus: false,
-    buildActivity: false,
-  },
 };
 
 export default nextConfig;
