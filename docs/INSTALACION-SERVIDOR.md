@@ -202,7 +202,11 @@ npm run import:donors:huav
 npm run openwa:register-webhook
 
 # Respaldo si el webhook no llega (Docker/LAN): consulta bandeja OpenWA cada minuto
-# crontab -e → * * * * * cd /ruta/proyecto && npm run openwa:poll-inbox >> /var/log/openwa-poll.log 2>&1
+mkdir -p logs
+# crontab -e → * * * * * cd /opt/Hemocentro_Record && npm run openwa:poll-inbox >> logs/openwa-poll.log 2>&1
+
+# Diagnóstico completo (BD app, HUAV, OpenWA, tsx)
+npm run server:diagnose
 
 # Verificar OpenWA
 curl http://localhost:2785/api/health
@@ -337,9 +341,14 @@ No requiere redirect URI ni túnel.
 |---|---|
 | `ECONNREFUSED 127.0.0.1:3306` | BD no está en la VM: use `192.168.1.4` en `.env`, no `localhost` |
 | `Can't reach database server` | Desde VM: `nc -zv 192.168.1.4 3306` — firewall/MySQL remoto en Windows |
+| `Access denied` al importar HUAV | `hemocentro_app` conecta pero falta `GRANT SELECT ON huav.* TO 'He_mo_center'@'192.168.1.112'` en MySQL Windows |
+| Importación HUAV falla en la web | `npm run db:check:huav` — debe devolver filas de `donantes_info.sql` |
+| WhatsApp «Sí» sin fechas | `npm run openwa:diagnose` (¿donante identificado?) + `npm run openwa:poll-inbox` |
+| Cron poll no corre | Verifique `logs/openwa-poll.log`, `crontab -l` y que `tsx` esté instalado (`npm install`) |
+| Donante no encontrado en WhatsApp | Importe donantes HUAV primero; solo hay ~6 de prueba si no importó |
 | Sin permiso `CREATE DATABASE` | Normal en BD `huav` corporativa; la BD ya debe existir |
 | OpenWA: session not found | Configuración → nombre sesión `default` → Generar QR |
-| Webhook no llega | En Linux use `172.17.0.1` en `OPENWA_WEBHOOK_URL`, no `host.docker.internal` |
+| Webhook no llega | Use sondeo cron (`openwa:poll-inbox`); webhook es opcional en Docker/LAN |
 | Puerto 3000 ocupado | `PORT=3001` en `.env` y reinicie |
 | Google OAuth: IP no válida | Use túnel HTTPS, localhost o cuenta de servicio (sección 10) |
 | Calendar conectado pero sin eventos | `npm run google:test-calendar` o cuenta de servicio + calendario compartido |
@@ -350,7 +359,12 @@ No requiere redirect URI ni túnel.
 
 ```bash
 npm run db:ensure          # Solo crear/verificar BD
-npm run db:check           # Probar conexión Prisma
+npm run db:check           # Probar conexión Prisma (hemocentro_app)
+npm run db:check:huav      # Probar lectura BD corporativa huav
+npm run server:diagnose    # Diagnóstico completo en servidor
+npm run import:donors:huav # Importar donantes desde huav
+npm run openwa:diagnose    # Mensajes WhatsApp + identificación donante
+npm run openwa:poll-inbox  # Procesar respuestas «Sí» manualmente
 npm run db:sync            # Re-sincronizar esquema
 npm run start              # Producción
 npm run dev:fresh          # Desarrollo

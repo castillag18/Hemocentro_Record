@@ -25,28 +25,16 @@ function jsonResponse(body: unknown, status = 200) {
   };
 }
 
-function isDebugIngest(url: string) {
-  return url.includes("7337/ingest");
-}
-
 describe("resolveOpenWaSessionUuid", () => {
   beforeEach(() => {
     mockFetch.mockReset();
-    mockFetch.mockImplementation((url: string) => {
-      if (isDebugIngest(String(url))) {
-        return Promise.resolve(jsonResponse({ ok: true }));
-      }
-      return Promise.resolve(jsonResponse({}));
-    });
+    mockFetch.mockImplementation(() => Promise.resolve(jsonResponse({})));
   });
 
   it("reutiliza UUID válido existente", async () => {
-    mockFetch.mockImplementation((url: string) => {
-      if (isDebugIngest(String(url))) {
-        return Promise.resolve(jsonResponse({ ok: true }));
-      }
-      return Promise.resolve(jsonResponse({ id: LIVE_UUID, name: "default" }));
-    });
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(jsonResponse({ id: LIVE_UUID, name: "default" })),
+    );
 
     const uuid = await resolveOpenWaSessionUuid({
       ...opts,
@@ -54,18 +42,12 @@ describe("resolveOpenWaSessionUuid", () => {
     });
 
     expect(uuid).toBe(LIVE_UUID);
-    const apiCalls = mockFetch.mock.calls.filter(
-      ([url]) => !isDebugIngest(String(url)),
-    );
-    expect(apiCalls).toHaveLength(1);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
   it("recupera sesión por nombre cuando el UUID guardado ya no existe", async () => {
     let apiCall = 0;
-    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
-      if (isDebugIngest(String(url))) {
-        return Promise.resolve(jsonResponse({ ok: true }));
-      }
+    mockFetch.mockImplementation((_url: string, init?: RequestInit) => {
       apiCall += 1;
       if (apiCall === 1) return Promise.resolve(jsonResponse({ message: "not found" }, 404));
       if (apiCall === 2) return Promise.resolve(jsonResponse([]));
@@ -81,21 +63,15 @@ describe("resolveOpenWaSessionUuid", () => {
     });
 
     expect(uuid).toBe("new-session-uuid");
-    const apiCalls = mockFetch.mock.calls.filter(
-      ([url]) => !isDebugIngest(String(url)),
-    );
-    expect(apiCalls[0][0]).toContain(STALE_UUID);
-    expect(apiCalls[1][0]).toContain("/api/sessions");
-    expect(apiCalls[2][1]?.method).toBe("POST");
+    expect(mockFetch.mock.calls[0][0]).toContain(STALE_UUID);
+    expect(mockFetch.mock.calls[1][0]).toContain("/api/sessions");
+    expect(mockFetch.mock.calls[2][1]?.method).toBe("POST");
   });
 
   it("encuentra sesión existente por nombre default", async () => {
-    mockFetch.mockImplementation((url: string) => {
-      if (isDebugIngest(String(url))) {
-        return Promise.resolve(jsonResponse({ ok: true }));
-      }
-      return Promise.resolve(jsonResponse([{ id: LIVE_UUID, name: "default" }]));
-    });
+    mockFetch.mockImplementation(() =>
+      Promise.resolve(jsonResponse([{ id: LIVE_UUID, name: "default" }])),
+    );
 
     const uuid = await resolveOpenWaSessionUuid({
       ...opts,

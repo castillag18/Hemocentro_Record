@@ -3,12 +3,28 @@
  * Uso: npm run db:check
  */
 const { PrismaClient } = require("@prisma/client");
+require("./load-env.cjs").loadEnv();
 
 const url = process.env.DATABASE_URL || "";
 const masked = url.replace(/:([^:@/]+)@/, ":****@");
 
 async function main() {
   console.log("DATABASE_URL:", masked || "(no definida)");
+
+  const dbName = (() => {
+    try {
+      const normalized = url.replace(/^mysql:\/\//, "http://");
+      return decodeURIComponent(new URL(normalized).pathname.replace(/^\//, "").split("?")[0]);
+    } catch {
+      return "";
+    }
+  })();
+  const huavName = (process.env.HUAV_DB_NAME || "huav").toLowerCase();
+  if (dbName && dbName.toLowerCase() === huavName) {
+    console.error("\n❌ DATABASE_URL apunta a la BD corporativa «huav».");
+    console.error("   Use hemocentro_app para Prisma. Ver docs/RECUPERACION-BD-HUAV.md");
+    process.exit(1);
+  }
 
   if (!url) {
     console.error("\n❌ Falta DATABASE_URL en .env");

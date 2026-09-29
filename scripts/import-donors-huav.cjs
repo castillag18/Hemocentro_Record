@@ -246,9 +246,22 @@ async function main() {
   }
 }
 
+function explainHuavError(error) {
+  const msg = error instanceof Error ? error.message : String(error);
+  if (/access denied/i.test(msg)) {
+    const user = process.env.HUAV_DB_USER || "He_mo_center";
+    const clientHost = process.env.SERVER_IP || "192.168.1.112";
+    console.error("\n→ Solicite a TI en MySQL (Windows Server 192.168.1.4):");
+    console.error(`  GRANT SELECT ON huav.* TO '${user}'@'${clientHost}';`);
+    console.error("  FLUSH PRIVILEGES;");
+    console.error("\n  La app usa hemocentro_app para Prisma; huav es solo lectura para importar donantes.");
+  }
+}
+
 main()
   .catch((error) => {
-    console.error(error);
+    console.error(error instanceof Error ? error.message : error);
+    explainHuavError(error);
     process.exit(1);
   })
   .finally(async () => {

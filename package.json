@@ -13,6 +13,8 @@
     "test:watch": "vitest",
     "test:google-calendar": "vitest run lib/google-calendar.integration.test.ts",
     "db:check": "node scripts/check-db.cjs",
+    "db:check:huav": "node scripts/check-huav-db.cjs",
+    "server:diagnose": "node scripts/server-diagnose.cjs",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:push": "node scripts/guard-app-database.cjs && prisma db push",
@@ -55,6 +57,7 @@
     "sanitize-html": "^2.17.7",
     "sweetalert2": "^11.26.25",
     "xlsx": "^0.18.5",
+    "tsx": "^4.23.12",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -71,7 +74,6 @@
     "eslint-config-next": "16.3.2",
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
-    "tsx": "^4.23.12",
     "typescript": "^5",
     "vitest": "^2.1.9"
   }
