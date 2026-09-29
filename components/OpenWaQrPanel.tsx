@@ -54,6 +54,8 @@ export function OpenWaQrPanel({
   const [webhookUrl, setWebhookUrl] = useState("");
   const [webhookRegistered, setWebhookRegistered] = useState<boolean | null>(null);
   const [registeringWebhook, setRegisteringWebhook] = useState(false);
+  const [pollingInbox, setPollingInbox] = useState(false);
+  const [lastPollSummary, setLastPollSummary] = useState("");
 
   const payload = useMemo(
     () => ({
@@ -139,6 +141,44 @@ export function OpenWaQrPanel({
     if (!enabled || status.toLowerCase() !== "ready") return;
     void checkWebhook();
   }, [enabled, status, checkWebhook]);
+
+  const pollInbox = useCallback(async () => {
+    if (!enabled || config.whatsappMode !== "openwa" || status.toLowerCase() !== "ready") return;
+    setPollingInbox(true);
+    try {
+      const data = await api<{
+        processed?: number;
+        skipped?: number;
+        error?: string;
+        results?: Array<{ step?: string; deliveryFailed?: boolean }>;
+      }>("/api/openwa", {
+        method: "POST",
+        body: JSON.stringify({ action: "poll-inbox", ...payload }),
+      });
+      if (data.error) {
+        setLastPollSummary(`Error: ${data.error}`);
+        return;
+      }
+      const step = data.results?.[0]?.step;
+      const failed = data.results?.some((r) => r.deliveryFailed);
+      setLastPollSummary(
+        `Procesados: ${data.processed ?? 0}, omitidos: ${data.skipped ?? 0}` +
+          (step ? ` · ${step}` : "") +
+          (failed ? " · envío fallido (reintenta)" : ""),
+      );
+    } catch (err) {
+      setLastPollSummary(err instanceof Error ? err.message : "Error al sondear bandeja");
+    } finally {
+      setPollingInbox(false);
+    }
+  }, [enabled, config.whatsappMode, status, payload]);
+
+  useEffect(() => {
+    if (!enabled || status.toLowerCase() !== "ready") return;
+    void pollInbox();
+    const timer = setInterval(() => void pollInbox(), 45_000);
+    return () => clearInterval(timer);
+  }, [enabled, status, pollInbox]);
 
   useEffect(() => {
     if (status.toLowerCase() !== "qr_ready" || !enabled) return;
@@ -320,10 +360,19 @@ export function OpenWaQrPanel({
         <div className="rounded-lg border border-outline-variant bg-surface-container-lowest p-3 space-y-2">
           <p className="text-body-sm font-medium text-on-surface">Respuestas de donantes (agendamiento)</p>
           <p className="text-body-xs text-secondary">
-            Las respuestas «Sí» se procesan por <strong>sondeo en servidor</strong> (cron:{" "}
-            <code className="text-body-xs">npm run openwa:poll-inbox</code> cada minuto).
-            El webhook es opcional; OpenWA puede bloquearlo por SSRF en Docker.
+            Las respuestas «Sí» se procesan por sondeo en servidor (cron o PM2). Mientras esta
+            pantalla esté abierta, también se consulta cada 45 s.
           </p>
+          {lastPollSummary ? (
+            <p className="text-body-xs text-secondary">Último sondeo: {lastPollSummary}</p>
+          ) : null}
+          <Button
+            variant="outline"
+            onClick={() => void pollInbox()}
+            disabled={pollingInbox || loading}
+          >
+            {pollingInbox ? "Procesando..." : "Procesar respuestas ahora"}
+          </Button>
           {webhookUrl ? (
             <p className="text-body-xs font-mono text-secondary break-all">URL: {webhookUrl}</p>
           ) : null}

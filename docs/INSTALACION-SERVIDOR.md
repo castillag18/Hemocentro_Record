@@ -201,14 +201,13 @@ npm run import:donors:huav
 # Registrar webhook WhatsApp (respuestas Sí / agendamiento)
 npm run openwa:register-webhook
 
-# Respaldo si el webhook no llega (Docker/LAN): consulta bandeja OpenWA cada minuto
+# Respuestas «Sí» → fechas de cita (obligatorio si el webhook no llega)
 mkdir -p logs
-# Cron: use ruta COMPLETA a npm (cron no carga PATH de nvm)
-#   which npm   → ej. /home/hemoc/.nvm/versions/node/v24.21.0/bin/npm
-# crontab -e:
-# * * * * * cd /opt/Hemocentro_Record && /home/hemoc/.nvm/versions/node/v24.21.0/bin/npm run openwa:poll-inbox >> logs/openwa-poll.log 2>&1
-# Alternativa:
-# * * * * * bash -lc 'cd /opt/Hemocentro_Record && npm run openwa:poll-inbox >> logs/openwa-poll.log 2>&1'
+npm run openwa:install-cron
+
+# Alternativa con PM2 (24/7 sin depender de cron):
+# pm2 start scripts/openwa-poll-loop.cjs --name openwa-poll
+# pm2 save
 
 # Diagnóstico completo (BD app, HUAV, OpenWA, tsx)
 npm run server:diagnose

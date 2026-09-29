@@ -34,6 +34,7 @@ function shouldMarkMessageProcessed(result: Record<string, unknown>) {
   if (result.ok === true) {
     return result.deliveryFailed !== true;
   }
+  if (result.error && result.deliveryFailed === true) return false;
   if (result.error) return true;
   if (result.ignored === true) {
     const reason = String(result.reason ?? "");
@@ -41,10 +42,12 @@ function shouldMarkMessageProcessed(result: Record<string, unknown>) {
       reason === "No es una respuesta afirmativa" ||
       reason === "Donante no encontrado" ||
       reason === "Donante no aceptado" ||
-      reason === "Mensaje incompleto"
+      reason === "Mensaje incompleto" ||
+      reason === "Selección inválida"
     ) {
       return false;
     }
+    if (reason === "Ya tiene cita pendiente") return true;
     return true;
   }
   return false;
@@ -158,7 +161,6 @@ export async function pollOpenWaInbox(settingsInput?: Awaited<ReturnType<typeof 
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Error al procesar mensaje";
         errors.push(`${messageId}: ${msg}`);
-        await markMessageProcessed(messageId, "poll-error");
         skipped += 1;
         continue;
       }
