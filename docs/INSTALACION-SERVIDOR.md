@@ -335,7 +335,77 @@ No requiere redirect URI ni túnel.
 
 ---
 
-## 11. Solución de problemas
+## 11. Permisos MySQL — `Access denied` al importar HUAV
+
+Si `npm run db:check:huav` muestra:
+
+```text
+Access denied for user 'He_mo_center'@'192.168.1.112' (using password: YES)
+```
+
+la VM **sí llega** a MySQL, pero falta permiso sobre la base **`huav`**. Los comandos deben ejecutarse en **MySQL Workbench conectado al servidor `192.168.1.4`**, no en la VM.
+
+### Paso 1 — Conectar Workbench
+
+| Campo | Valor |
+|---|---|
+| Host | `192.168.1.4` (o `localhost` si Workbench está en ese Windows) |
+| Puerto | `3306` |
+| Usuario | `root` o un DBA con permiso `GRANT` |
+
+### Paso 2 — Diagnosticar (pegar y ejecutar)
+
+```sql
+SELECT user, host FROM mysql.user WHERE user = 'He_mo_center';
+SHOW GRANTS FOR 'He_mo_center'@'192.168.1.112';
+```
+
+Revise la salida:
+
+- Si **no existe** `'He_mo_center'@'192.168.1.112'`, hay que crearlo (paso 3).
+- Si existe pero **no aparece** `GRANT SELECT ON \`huav\`.*`, hay que otorgarlo (paso 3).
+- Si el `GRANT` está en `'He_mo_center'@'%'` pero también existe `'He_mo_center'@'192.168.1.112'` **sin** permiso en `huav`, MySQL usa la cuenta más específica (`192.168.1.112`) y sigue fallando — otorgue en **esa** cuenta.
+
+### Paso 3 — Script completo (recomendado)
+
+En el repo: `scripts/mysql-grants-huav.sql`. En Workbench: **File → Open SQL Script** → ejecutar todo.
+
+O pegue manualmente:
+
+```sql
+CREATE USER IF NOT EXISTS 'He_mo_center'@'192.168.1.112'
+  IDENTIFIED BY 'H*3M0eNt3R';
+
+GRANT ALL PRIVILEGES ON hemocentro_app.* TO 'He_mo_center'@'192.168.1.112';
+GRANT SELECT ON huav.* TO 'He_mo_center'@'192.168.1.112';
+
+FLUSH PRIVILEGES;
+
+SHOW GRANTS FOR 'He_mo_center'@'192.168.1.112';
+```
+
+La última consulta **debe** listar `GRANT SELECT ON \`huav\`.*`.
+
+### Paso 4 — Probar desde la VM Linux
+
+```bash
+cd /opt/Hemocentro_Record
+npm run db:check:huav
+npm run import:donors:huav
+```
+
+### Errores frecuentes en Workbench
+
+| Error | Causa |
+|---|---|
+| Ejecutó el GRANT pero la VM sigue igual | `FLUSH PRIVILEGES` omitido, o GRANT en `@'%'` pero existe `@'192.168.1.112'` sin permiso |
+| `Access denied` solo en `huav` | Falta `GRANT SELECT ON huav.*` (hemocentro_app ya funciona) |
+| Workbench conectado a otro servidor | Debe ser el MySQL de `192.168.1.4`, no una réplica ni Docker local |
+| Contraseña incorrecta | `ALTER USER 'He_mo_center'@'192.168.1.112' IDENTIFIED BY '...';` y actualizar `.env` |
+
+---
+
+## 12. Solución de problemas
 
 | Problema | Solución |
 |---|---|
@@ -355,7 +425,7 @@ No requiere redirect URI ni túnel.
 
 ---
 
-## 12. Referencia rápida
+## 13. Referencia rápida
 
 ```bash
 npm run db:ensure          # Solo crear/verificar BD
