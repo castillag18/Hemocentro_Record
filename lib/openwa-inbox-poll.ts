@@ -122,6 +122,7 @@ export async function pollOpenWaInbox(settingsInput?: Awaited<ReturnType<typeof 
   let processed = 0;
   let skipped = 0;
   const errors: string[] = [];
+  const skippedReasons: string[] = [];
   const results: Awaited<ReturnType<typeof processOpenWaInboundMessage>>[] = [];
 
   try {
@@ -131,6 +132,7 @@ export async function pollOpenWaInbox(settingsInput?: Awaited<ReturnType<typeof 
       const messageId = message.id!;
       if (await isMessageProcessed(messageId)) {
         skipped += 1;
+        skippedReasons.push(`${messageId.slice(0, 8)}…: ya procesado`);
         continue;
       }
 
@@ -171,6 +173,16 @@ export async function pollOpenWaInbox(settingsInput?: Awaited<ReturnType<typeof 
         results.push(result);
       } else {
         skipped += 1;
+        const r = result as Record<string, unknown>;
+        const detail =
+          r.deliveryFailed === true
+            ? "envío fallido (reintento)"
+            : r.reason
+              ? String(r.reason)
+              : r.error
+                ? String(r.error)
+                : "sin acción";
+        skippedReasons.push(`${body.slice(0, 24)}…: ${detail}`);
       }
     }
 
@@ -184,6 +196,7 @@ export async function pollOpenWaInbox(settingsInput?: Awaited<ReturnType<typeof 
       processed,
       skipped,
       results,
+      ...(skippedReasons.length ? { skippedReasons } : {}),
       ...(errors.length ? { warnings: errors } : {}),
     };
   } catch (err) {

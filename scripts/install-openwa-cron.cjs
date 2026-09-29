@@ -18,15 +18,22 @@ function which(cmd) {
   }
 }
 
-const npm = which("npm");
-if (!npm) {
-  console.error("❌ No se encontró npm en PATH. Cargue nvm: source ~/.nvm/nvm.sh");
+const node =
+  which("node") ||
+  process.execPath ||
+  (which("npm") ? path.join(path.dirname(which("npm")), "node") : "");
+
+if (!node || !fs.existsSync(node)) {
+  console.error("❌ No se encontró node. Ejecute: source ~/.nvm/nvm.sh && which node");
   process.exit(1);
 }
 
 fs.mkdirSync(logsDir, { recursive: true });
 
-const cronLine = `* * * * * cd ${root} && ${npm} run openwa:poll-inbox >> ${logFile} 2>&1`;
+const pollScript = path.join(root, "scripts", "run-openwa-inbox-poll.cjs");
+const nodeBin = path.dirname(node);
+// Cron no carga nvm: invocar node directamente (npm run falla con «env: node not found»).
+const cronLine = `* * * * * cd ${root} && PATH=${nodeBin}:$PATH ${node} ${pollScript} >> ${logFile} 2>&1`;
 
 let existing = "";
 try {
@@ -35,13 +42,33 @@ try {
   existing = "";
 }
 
-if (existing.includes("openwa:poll-inbox")) {
-  console.log("✓ Cron openwa:poll-inbox ya estaba configurado");
-  console.log(existing.split("\n").filter((l) => l.includes("openwa:poll-inbox")).join("\n"));
+function isOpenWaPollLine(line) {
+  const t = line.trim();
+  if (!t || t.startsWith("#")) return false;
+  return (
+    t.includes("openwa:poll-inbox") ||
+    t.includes("openwa-poll") ||
+    t.includes("run-openwa-inbox-poll") ||
+    t.includes("/ruta/completa/npm")
+  );
+}
+
+const force = process.argv.includes("--force");
+const hasPoll = existing.split("\n").some(isOpenWaPollLine);
+
+if (hasPoll && !force) {
+  console.log("✓ Cron openwa:poll-inbox ya configurado. Para reemplazar: npm run openwa:install-cron -- --force");
+  console.log(existing.split("\n").filter(isOpenWaPollLine).join("\n"));
   process.exit(0);
 }
 
-const updated = `${existing.trim()}\n${cronLine}\n`.trim() + "\n";
+const cleaned = existing
+  .split("\n")
+  .filter((line) => !isOpenWaPollLine(line))
+  .join("\n")
+  .trim();
+
+const updated = `${cleaned}\n${cronLine}\n`.trim() + "\n";
 const tmp = path.join(logsDir, "crontab.tmp");
 fs.writeFileSync(tmp, updated);
 
@@ -58,4 +85,5 @@ if (result.status !== 0) {
 console.log("✓ Cron instalado (cada minuto):");
 console.log(cronLine);
 console.log(`\nLog: tail -f ${logFile}`);
-console.log("\nPrueba manual: npm run openwa:poll-inbox");
+console.log(`\nPrueba manual: ${node} ${pollScript}`);
+console.log("Si el log mostraba «env: node not found», el cron anterior usaba npm — ya corregido.");
