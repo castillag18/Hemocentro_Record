@@ -5,9 +5,20 @@
 const fs = require("fs");
 const path = require("path");
 const mysql = require("mysql2/promise");
-const { loadEnv, buildHuavDatabaseUrl } = require("./load-env.cjs");
+const { loadEnv, buildHuavDatabaseUrl, normalizeHuavPassword } = require("./load-env.cjs");
 
 loadEnv();
+
+function warnIfPasswordUrlEncoded() {
+  const raw = process.env.HUAV_DB_PASSWORD || "";
+  if (!raw.includes("%")) return;
+  const normalized = normalizeHuavPassword(raw);
+  if (normalized !== raw) {
+    console.warn("\n⚠ HUAV_DB_PASSWORD estaba URL-codificada (%2A). Use la contraseña real:");
+    console.warn('   HUAV_DB_PASSWORD="H*3M0eNt3R"');
+    console.warn("   (En DATABASE_URL sí use %2A; en HUAV_DB_PASSWORD use el asterisco *)\n");
+  }
+}
 
 function maskUrl(url) {
   return url.replace(/:([^:@/]+)@/, ":****@");
@@ -23,11 +34,18 @@ function suggestGrantFix(errMsg) {
   console.error("\n  Nota: hemocentro_app puede conectar, pero huav requiere permiso SELECT aparte.");
   console.error(`  Host cliente detectado en docs: ${clientHost} (VM Linux con la app).`);
   if (/access denied/i.test(errMsg)) {
-    console.error("\n  Causa probable: el usuario existe pero no tiene SELECT sobre la base «huav».");
+    const raw = process.env.HUAV_DB_PASSWORD || "";
+    if (raw.includes("%2A") || raw.includes("%2a")) {
+      console.error("\n  Causa probable: HUAV_DB_PASSWORD con %2A en lugar de *.");
+      console.error('  Corrija .env: HUAV_DB_PASSWORD="H*3M0eNt3R"');
+    } else {
+      console.error("\n  Causa probable: falta GRANT SELECT ON huav.* o contraseña incorrecta.");
+    }
   }
 }
 
 async function main() {
+  warnIfPasswordUrlEncoded();
   const url = buildHuavDatabaseUrl();
   if (!url) {
     console.error("❌ Falta HUAV_DB_USER / HUAV_DB_PASSWORD en .env");

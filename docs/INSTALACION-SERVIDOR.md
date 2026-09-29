@@ -203,7 +203,12 @@ npm run openwa:register-webhook
 
 # Respaldo si el webhook no llega (Docker/LAN): consulta bandeja OpenWA cada minuto
 mkdir -p logs
-# crontab -e → * * * * * cd /opt/Hemocentro_Record && npm run openwa:poll-inbox >> logs/openwa-poll.log 2>&1
+# Cron: use ruta COMPLETA a npm (cron no carga PATH de nvm)
+#   which npm   → ej. /home/hemoc/.nvm/versions/node/v24.21.0/bin/npm
+# crontab -e:
+# * * * * * cd /opt/Hemocentro_Record && /home/hemoc/.nvm/versions/node/v24.21.0/bin/npm run openwa:poll-inbox >> logs/openwa-poll.log 2>&1
+# Alternativa:
+# * * * * * bash -lc 'cd /opt/Hemocentro_Record && npm run openwa:poll-inbox >> logs/openwa-poll.log 2>&1'
 
 # Diagnóstico completo (BD app, HUAV, OpenWA, tsx)
 npm run server:diagnose
@@ -414,7 +419,8 @@ npm run import:donors:huav
 | `Access denied` al importar HUAV | `hemocentro_app` conecta pero falta `GRANT SELECT ON huav.* TO 'He_mo_center'@'192.168.1.112'` en MySQL Windows |
 | Importación HUAV falla en la web | `npm run db:check:huav` — debe devolver filas de `donantes_info.sql` |
 | WhatsApp «Sí» sin fechas | `npm run openwa:diagnose` (¿donante identificado?) + `npm run openwa:poll-inbox` |
-| Cron poll no corre | Verifique `logs/openwa-poll.log`, `crontab -l` y que `tsx` esté instalado (`npm install`) |
+| Cron poll no corre | Log muestra `/usr/bin/npm: not found` → use ruta completa a npm (`which npm`) o `bash -lc` en crontab |
+| `Access denied` con GRANT OK | `HUAV_DB_PASSWORD` debe ser `H*3M0eNt3R`, **no** `H%2A3M0eNt3R` (%2A solo en `DATABASE_URL`) |
 | Donante no encontrado en WhatsApp | Importe donantes HUAV primero; solo hay ~6 de prueba si no importó |
 | Sin permiso `CREATE DATABASE` | Normal en BD `huav` corporativa; la BD ya debe existir |
 | OpenWA: session not found | Configuración → nombre sesión `default` → Generar QR |

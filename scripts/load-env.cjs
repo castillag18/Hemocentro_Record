@@ -24,15 +24,27 @@ function loadEnv() {
   }
 }
 
+/** HUAV_DB_PASSWORD debe ser la contraseña real (H*3...), no la forma URL (%2A). */
+function normalizeHuavPassword(pass) {
+  if (!pass || !pass.includes("%")) return pass;
+  try {
+    const decoded = decodeURIComponent(pass);
+    if (decoded !== pass) return decoded;
+  } catch {
+    /* ignore */
+  }
+  return pass;
+}
+
 function buildHuavDatabaseUrl() {
   if (process.env.HUAV_DATABASE_URL) return process.env.HUAV_DATABASE_URL;
   const host = process.env.HUAV_DB_HOST || "localhost";
   const port = process.env.HUAV_DB_PORT || "3306";
   const name = process.env.HUAV_DB_NAME || "huav";
   const user = process.env.HUAV_DB_USER || "";
-  const pass = process.env.HUAV_DB_PASSWORD || "";
+  const pass = normalizeHuavPassword(process.env.HUAV_DB_PASSWORD || "");
   if (!user) return process.env.DATABASE_URL || "";
   return `mysql://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}:${port}/${name}`;
 }
 
-module.exports = { loadEnv, buildHuavDatabaseUrl };
+module.exports = { loadEnv, buildHuavDatabaseUrl, normalizeHuavPassword };

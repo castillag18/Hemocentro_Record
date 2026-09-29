@@ -17,7 +17,15 @@ export function buildHuavDatabaseUrl(): string | null {
   const port = process.env.HUAV_DB_PORT || "3306";
   const name = process.env.HUAV_DB_NAME || "huav";
   const user = process.env.HUAV_DB_USER || "";
-  const pass = process.env.HUAV_DB_PASSWORD || "";
+  let pass = process.env.HUAV_DB_PASSWORD || "";
+  if (pass.includes("%")) {
+    try {
+      const decoded = decodeURIComponent(pass);
+      if (decoded !== pass) pass = decoded;
+    } catch {
+      /* HUAV_DB_PASSWORD literal, not URL-encoded */
+    }
+  }
   if (!user) return null;
 
   return `mysql://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}:${port}/${name}`;
