@@ -227,9 +227,20 @@ Para que la app sobreviva al cerrar la terminal:
 
 ```bash
 npm install -g pm2
+cd /opt/Hemocentro_Record
+npm run build          # requiere ~4 GB RAM o swap (ver sección 8)
 pm2 start npm --name "huav" -- start
 pm2 save
 pm2 startup
+```
+
+Si el build falla con `heap out of memory`, use:
+
+```bash
+export NODE_OPTIONS=--max-old-space-size=4096
+npm run build
+pm2 start npm --name "huav" -- start
+pm2 save
 ```
 
 ---

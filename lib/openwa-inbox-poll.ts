@@ -69,12 +69,29 @@ async function fetchRecentIncomingMessages(settings: Awaited<ReturnType<typeof g
     apiKey: settings.whatsappOpenWaApiKey || process.env.WHATSAPP_OPENWA_API_KEY || "",
     sessionId: settings.whatsappOpenWaSessionId,
   };
-  const sessionUuid = await resolveOpenWaSessionUuid(ctx);
   const base = ctx.baseUrl.replace(/\/$/, "");
-  const res = await fetchWithTimeout(
-    `${base}/api/sessions/${encodeURIComponent(sessionUuid)}/messages?limit=40`,
-    { headers: openWaHeaders(ctx.apiKey), timeoutMs: getOpenWaFetchTimeoutMs() },
-  );
+  let sessionUuid: string;
+  try {
+    sessionUuid = await resolveOpenWaSessionUuid(ctx);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `OpenWA — listar sesión: ${msg}. Si tarda mucho: docker restart openwa-api y escanee el QR.`,
+    );
+  }
+
+  let res: Response;
+  try {
+    res = await fetchWithTimeout(
+      `${base}/api/sessions/${encodeURIComponent(sessionUuid)}/messages?limit=40`,
+      { headers: openWaHeaders(ctx.apiKey), timeoutMs: getOpenWaFetchTimeoutMs() },
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `OpenWA — consultar mensajes (sesión ${sessionUuid.slice(0, 8)}…): ${msg}. ¿WhatsApp vinculado con QR?`,
+    );
+  }
   const data = (await res.json().catch(() => ({}))) as { messages?: OpenWaListedMessage[] };
   if (!res.ok || !data.messages?.length) return [];
 

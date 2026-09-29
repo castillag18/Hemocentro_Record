@@ -1,9 +1,11 @@
 import { createRequire } from "module";
 import { getOpenWaFetchTimeoutMs } from "../lib/fetch-timeout";
 import { pollOpenWaInbox } from "../lib/openwa-inbox-poll";
-import { openWaHeaders } from "../lib/openwa-session";
+import { openWaHeaders, resolveOpenWaSessionUuid } from "../lib/openwa-session";
 import { getSettings } from "../lib/settings";
 import { prisma } from "../lib/prisma";
+
+const READY = new Set(["ready", "CONNECTED", "connected", "open"]);
 
 const require = createRequire(import.meta.url);
 require("./load-env.cjs").loadEnv();
@@ -35,6 +37,53 @@ async function preflightOpenWa(settings: Awaited<ReturnType<typeof getSettings>>
     process.exit(1);
   } finally {
     clearTimeout(timer);
+  }
+
+  const ctx = {
+    baseUrl: settings.whatsappOpenWaUrl,
+    apiKey: settings.whatsappOpenWaApiKey || process.env.WHATSAPP_OPENWA_API_KEY || "",
+    sessionId: settings.whatsappOpenWaSessionId,
+  };
+
+  let sessionUuid: string;
+  try {
+    sessionUuid = await resolveOpenWaSessionUuid(ctx);
+    console.log("preflight: sesión UUID", sessionUuid.slice(0, 8) + "…");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`preflight: no se pudo resolver sesión OpenWA (${msg})`);
+    console.error("→ docker restart openwa-api");
+    console.error("→ npm run openwa:restart-session");
+    process.exit(1);
+  }
+
+  const sessionController = new AbortController();
+  const sessionTimer = setTimeout(() => sessionController.abort(), timeoutMs);
+  try {
+    const sessionRes = await fetch(`${base}/api/sessions/${encodeURIComponent(sessionUuid)}`, {
+      headers: openWaHeaders(apiKey),
+      signal: sessionController.signal,
+    });
+    const sessionData = (await sessionRes.json().catch(() => ({}))) as {
+      status?: string;
+      state?: string;
+      phone?: string | null;
+    };
+    const status = String(sessionData.status ?? sessionData.state ?? "desconocido");
+    console.log("preflight: estado sesión:", status);
+    if (!READY.has(status)) {
+      console.error("\n❌ WhatsApp no está vinculado (sesión no lista).");
+      console.error("→ Configuración → Canales → Generar QR y escanear");
+      console.error("→ npm run openwa:restart-session");
+      process.exit(1);
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`preflight: timeout al leer sesión (${msg})`);
+    console.error("→ docker restart openwa-api");
+    process.exit(1);
+  } finally {
+    clearTimeout(sessionTimer);
   }
 }
 

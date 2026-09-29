@@ -5,23 +5,9 @@
 require("./load-env.cjs").loadEnv();
 
 const { PrismaClient } = require("@prisma/client");
+const { fetchOpenWa, resolveSessionUuid } = require("./openwa-http.cjs");
 
-const TIMEOUT_MS = Number(process.env.OPENWA_FETCH_TIMEOUT_MS) || 10_000;
-
-async function fetchOpenWa(url, headers) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    const res = await fetch(url, { headers, signal: controller.signal });
-    const data = await res.json().catch(() => ({}));
-    return { ok: res.ok, status: res.status, data };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { ok: false, status: 0, error: msg };
-  } finally {
-    clearTimeout(timer);
-  }
-}
+const READY = new Set(["ready", "CONNECTED", "connected", "open"]);
 
 async function main() {
   const p = new PrismaClient();
@@ -36,36 +22,58 @@ async function main() {
       /\/$/,
       "",
     );
-    const uuid = s.whatsappOpenWaSessionId;
+    const storedSession = s.whatsappOpenWaSessionId || process.env.WHATSAPP_OPENWA_SESSION_ID || "default";
     const key = s.whatsappOpenWaApiKey || process.env.WHATSAPP_OPENWA_API_KEY || "";
-    const headers = { "Content-Type": "application/json" };
-    if (key) headers["X-API-Key"] = key;
 
     console.log("OpenWA URL:", base);
     console.log("API key:", key ? "configurada" : "FALTA");
+    console.log("Sesión configurada:", storedSession);
 
-    const health = await fetchOpenWa(`${base}/api/health`, headers);
+    const health = await fetchOpenWa(`${base}/api/health`, key, 10_000);
     if (!health.ok) {
       console.error("\n❌ OpenWA no responde en", base);
       console.error(" ", health.error || `HTTP ${health.status}`);
-      console.error("\n→ docker ps | grep -i openwa");
+      console.error("\n→ docker ps | grep openwa");
       console.error(`→ curl -m 5 ${base}/api/health`);
-      console.error("→ Si el contenedor está caído: docker start <contenedor-openwa>");
       process.exit(1);
     }
     console.log("\n✓ /api/health OK");
 
-    if (uuid) {
-      const session = await fetchOpenWa(`${base}/api/sessions/${encodeURIComponent(uuid)}`, headers);
-      const status = session.data?.status ?? session.data?.state ?? "(desconocido)";
-      const phone = session.data?.phone ?? "(sin teléfono)";
-      console.log(`✓ Sesión ${uuid.slice(0, 8)}… estado: ${status}, tel: ${phone}`);
-      if (status !== "ready" && status !== "CONNECTED" && status !== "connected") {
-        console.warn("\n⚠ Sesión no está lista. Configuración → Generar QR y escanear.");
-      }
-    } else {
-      console.warn("\n⚠ Sin whatsappOpenWaSessionId en Settings");
+    let sessionUuid;
+    try {
+      sessionUuid = await resolveSessionUuid(base, key, storedSession);
+    } catch (err) {
+      console.error("\n❌", err instanceof Error ? err.message : err);
+      console.error("\n→ docker restart openwa-api");
+      console.error("→ npm run openwa:restart-session");
+      process.exit(1);
     }
+
+    const session = await fetchOpenWa(
+      `${base}/api/sessions/${encodeURIComponent(sessionUuid)}`,
+      key,
+    );
+    if (!session.ok) {
+      console.error("\n❌ No se pudo leer la sesión", sessionUuid);
+      console.error(" ", session.error || `HTTP ${session.status}`);
+      process.exit(1);
+    }
+
+    const status = String(session.data?.status ?? session.data?.state ?? "desconocido");
+    const phone = session.data?.phone ?? session.data?.me?.user ?? "(sin teléfono)";
+    console.log(`✓ Sesión ${sessionUuid.slice(0, 8)}… (${session.data?.name ?? "?"})`);
+    console.log(`  Estado: ${status}`);
+    console.log(`  Teléfono: ${phone}`);
+
+    if (!READY.has(status)) {
+      console.warn("\n⚠ WhatsApp NO vinculado. Pasos:");
+      console.warn("  1. Abra http://192.168.1.112:3000 → Configuración → Canales");
+      console.warn("  2. Generar QR y escanee con el teléfono del banco de sangre");
+      console.warn("  3. Si sigue fallando: npm run openwa:restart-session");
+      process.exit(1);
+    }
+
+    console.log("\n✓ Sesión lista para enviar y recibir mensajes");
   } finally {
     await p.$disconnect();
   }

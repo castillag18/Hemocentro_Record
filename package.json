@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "next dev --turbopack --hostname 0.0.0.0",
     "dev:fresh": "node scripts/check-db.cjs && node scripts/free-port-3000.cjs && next dev --turbopack --hostname 0.0.0.0",
-    "build": "prisma generate && next build",
-    "build:server": "NODE_OPTIONS=--max-old-space-size=4096 prisma generate && NODE_OPTIONS=--max-old-space-size=4096 next build",
+    "build": "node scripts/build-production.cjs",
+    "build:server": "node scripts/build-production.cjs",
     "start": "next start --hostname 0.0.0.0",
     "lint": "eslint",
     "test": "vitest run",
