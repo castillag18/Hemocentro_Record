@@ -1,4 +1,4 @@
-import { fetchWithTimeout } from "./fetch-timeout";
+import { fetchWithTimeout, getOpenWaFetchTimeoutMs } from "./fetch-timeout";
 import { prisma } from "./prisma";
 import { resolveOpenWaContactPhone } from "./openwa-contacts";
 import { openWaHeaders, resolveOpenWaSessionUuid } from "./openwa-session";
@@ -73,7 +73,7 @@ async function fetchRecentIncomingMessages(settings: Awaited<ReturnType<typeof g
   const base = ctx.baseUrl.replace(/\/$/, "");
   const res = await fetchWithTimeout(
     `${base}/api/sessions/${encodeURIComponent(sessionUuid)}/messages?limit=40`,
-    { headers: openWaHeaders(ctx.apiKey), timeoutMs: 8000 },
+    { headers: openWaHeaders(ctx.apiKey), timeoutMs: getOpenWaFetchTimeoutMs() },
   );
   const data = (await res.json().catch(() => ({}))) as { messages?: OpenWaListedMessage[] };
   if (!res.ok || !data.messages?.length) return [];
@@ -168,7 +168,13 @@ export async function pollOpenWaInbox(settingsInput?: Awaited<ReturnType<typeof 
       ...(errors.length ? { warnings: errors } : {}),
     };
   } catch (err) {
-    const error = err instanceof Error ? err.message : "Error al consultar bandeja OpenWA";
-    return { processed, skipped, error };
+    const baseUrl = settings.whatsappOpenWaUrl || process.env.WHATSAPP_OPENWA_URL || "http://localhost:2785";
+    const msg = err instanceof Error ? err.message : "Error al consultar bandeja OpenWA";
+    const timeoutMs = getOpenWaFetchTimeoutMs();
+    const hint =
+      /tiempo de espera|timeout|abort/i.test(msg)
+        ? ` OpenWA no respondió en ${timeoutMs} ms en ${baseUrl}. Verifique: curl ${baseUrl.replace(/\/$/, "")}/api/health y docker ps (contenedor OpenWA).`
+        : "";
+    return { processed, skipped, error: `${msg}.${hint}`, openWaUrl: baseUrl };
   }
 }

@@ -25,6 +25,7 @@
     "import:donors": "node scripts/import-donors.cjs",
     "import:donors:huav": "node scripts/import-donors-huav.cjs",
     "cron:reminders": "node scripts/run-cron.cjs",
+    "openwa:check": "node scripts/check-openwa-status.cjs",
     "openwa:register-webhook": "node scripts/register-openwa-webhook.cjs",
     "openwa:poll-inbox": "node scripts/run-openwa-inbox-poll.cjs",
     "openwa:diagnose": "tsx scripts/diagnose-openwa-inbound.ts",

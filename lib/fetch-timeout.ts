@@ -1,3 +1,10 @@
+/** Timeout OpenWA (ms). En servidor lento o Docker: OPENWA_FETCH_TIMEOUT_MS=20000 */
+export function getOpenWaFetchTimeoutMs() {
+  const raw = process.env.OPENWA_FETCH_TIMEOUT_MS?.trim();
+  const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 20_000;
+}
+
 /** fetch con límite de tiempo para no bloquear la app si OpenWA o la red tardan. */
 export async function fetchWithTimeout(
   input: RequestInfo | URL,
