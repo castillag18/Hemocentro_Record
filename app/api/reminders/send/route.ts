@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { jsonError, withAuth } from "@/lib/api";
-import { getDonorsForManualSend, getEligibleDonors } from "@/lib/eligibility";
+import { getAutoReminderDonors, getDonorsForManualSend } from "@/lib/eligibility";
 import { sendRemindersToDonors } from "@/lib/send-reminders";
 import { getSettings } from "@/lib/settings";
 import { openWaConfigured } from "@/lib/whatsapp";
@@ -29,13 +29,11 @@ export async function POST(request: Request) {
 
   let selected;
   if (body.donorIds?.length) {
-    selected = force
-      ? await getDonorsForManualSend(body.donorIds)
-      : (await getEligibleDonors()).eligible.filter(
-          (d) => body.donorIds!.includes(d.id) && d.reminderStatus !== "enviado",
-        );
+    const manual = await getDonorsForManualSend(body.donorIds);
+    selected = force ? manual : manual.filter((d) => d.reminderStatus !== "enviado");
   } else {
-    selected = (await getEligibleDonors()).eligible.filter((d) => d.reminderStatus !== "enviado");
+    const { eligible } = await getAutoReminderDonors();
+    selected = eligible.filter((d) => d.reminderStatus === "pendiente");
   }
 
   if (!selected.length) {

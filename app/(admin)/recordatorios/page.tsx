@@ -11,6 +11,7 @@ import { WhatsAppQueueModal, type WhatsAppQueueItem } from "@/components/WhatsAp
 import { Pagination } from "@/components/Pagination";
 import { LoadingOverlay } from "@/components/Spinner";
 import { alertError, alertSuccess, showLoading, closeLoading } from "@/lib/alerts";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 
 type Eligible = {
   id: string;
@@ -31,6 +32,8 @@ type RemindersData = {
   total: number;
   page: number;
   pageSize: number;
+  hasMore?: boolean;
+  totalExact?: boolean;
   donors: Eligible[];
 };
 
@@ -38,6 +41,7 @@ export default function RecordatoriosPage() {
   const [status, setStatus] = useState("pendiente");
   const [bloodType, setBloodType] = useState("");
   const [q, setQ] = useState("");
+  const debouncedQ = useDebouncedValue(q, 400);
   const [page, setPage] = useState(1);
   const [data, setData] = useState<RemindersData | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
@@ -46,21 +50,30 @@ export default function RecordatoriosPage() {
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [listLoading, setListLoading] = useState(false);
 
   const load = useCallback(async () => {
-    const params = new URLSearchParams({ status, page: String(page), pageSize: "15" });
+    const params = new URLSearchParams({ status, page: String(page), pageSize: "25" });
     if (bloodType) params.set("bloodType", bloodType);
-    if (q.trim()) params.set("q", q.trim());
-    setData(await api<RemindersData>(`/api/reminders?${params}`));
-    setSelected([]);
-    setInitialLoading(false);
-  }, [status, bloodType, q, page]);
+    if (debouncedQ.trim()) params.set("q", debouncedQ.trim());
+    setListLoading(true);
+    try {
+      setData(await api<RemindersData>(`/api/reminders?${params}`));
+      setSelected([]);
+    } finally {
+      setInitialLoading(false);
+      setListLoading(false);
+    }
+  }, [status, bloodType, debouncedQ, page]);
 
   useEffect(() => {
     void load().catch((err) => void alertError("Error", err instanceof Error ? err.message : "Error"));
   }, [load]);
 
-  const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / (data?.pageSize ?? 15)));
+  const totalExact = data?.totalExact !== false;
+  const totalPages = totalExact
+    ? Math.max(1, Math.ceil((data?.total ?? 0) / (data?.pageSize ?? 25)))
+    : page + (data?.hasMore ? 1 : 0);
 
   async function send(
     donorIds?: string[],
@@ -124,6 +137,7 @@ export default function RecordatoriosPage() {
     <div>
       {loading ? <LoadingOverlay message="Enviando recordatorios..." /> : null}
       {initialLoading && !data ? <LoadingOverlay message="Cargando donantes..." /> : null}
+      {listLoading && data ? <LoadingOverlay message="Actualizando lista..." /> : null}
       <div className="flex justify-between items-end mb-lg gap-md flex-wrap">
         <div>
           <h1 className="text-display-lg max-md:text-headline-lg mb-xs">Donantes elegibles</h1>
@@ -299,7 +313,9 @@ export default function RecordatoriosPage() {
           page={page}
           totalPages={totalPages}
           total={data?.total ?? 0}
-          pageSize={data?.pageSize ?? 15}
+          pageSize={data?.pageSize ?? 25}
+          hasMore={data?.hasMore}
+          totalExact={totalExact}
           onPageChange={setPage}
         />
       </div>

@@ -38,6 +38,10 @@ model Donor {
   reminderLogs          ReminderLog[]
   appointments          Appointment[]
   whatsappBookingSessions WhatsAppBookingSession[]
+
+  @@index([active, accepted, lastDonationDate])
+  @@index([bloodType])
+  @@index([name])
 }
 
 model Settings {

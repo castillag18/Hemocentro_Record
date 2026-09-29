@@ -14,6 +14,7 @@ import { ImportModal } from "@/components/ImportModal";
 import { Pagination } from "@/components/Pagination";
 import { LoadingOverlay } from "@/components/Spinner";
 import { alertError } from "@/lib/alerts";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 
 type ListResponse = {
   total: number;
@@ -34,29 +35,34 @@ function DonantesContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [q, setQ] = useState(searchParams.get("q") ?? "");
+  const debouncedQ = useDebouncedValue(q, 400);
   const [bloodType, setBloodType] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [data, setData] = useState<ListResponse | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<DonorRecord | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
     const params = new URLSearchParams({
-      q,
+      q: debouncedQ,
       page: String(page),
-      pageSize: "12",
+      pageSize: String(pageSize),
     });
     if (bloodType) params.set("bloodType", bloodType);
+    setLoading(true);
     try {
       setData(await api<ListResponse>(`/api/donors?${params}`));
     } catch (err) {
       void alertError("Error", err instanceof Error ? err.message : "Error al cargar");
     } finally {
       setInitialLoading(false);
+      setLoading(false);
     }
-  }, [q, bloodType, page]);
+  }, [debouncedQ, bloodType, page, pageSize]);
 
   useEffect(() => {
     void load();
@@ -72,11 +78,12 @@ function DonantesContent() {
     if (incomingQ) setQ(incomingQ);
   }, [searchParams, router]);
 
-  const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / (data?.pageSize ?? 12)));
+  const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / (data?.pageSize ?? pageSize)));
 
   return (
     <div>
       {initialLoading && !data ? <LoadingOverlay message="Cargando donantes..." /> : null}
+      {loading && data ? <LoadingOverlay message="Actualizando lista..." /> : null}
       {data && data.total <= 10 ? (
         <div className="mb-md">
           <HuavImportPanel onImported={() => void load()} />
@@ -132,6 +139,18 @@ function DonantesContent() {
             {BLOOD_TYPES.map((type) => (
               <option key={type}>{type}</option>
             ))}
+          </select>
+          <select
+            className="border border-outline-variant rounded-lg py-sm px-md bg-white"
+            value={pageSize}
+            onChange={(e) => {
+              setPage(1);
+              setPageSize(Number(e.target.value));
+            }}
+          >
+            <option value={25}>25 por página</option>
+            <option value={50}>50 por página</option>
+            <option value={100}>100 por página</option>
           </select>
         </div>
       </div>
@@ -200,7 +219,7 @@ function DonantesContent() {
           page={page}
           totalPages={totalPages}
           total={data?.total ?? 0}
-          pageSize={data?.pageSize ?? 12}
+          pageSize={data?.pageSize ?? pageSize}
           onPageChange={setPage}
         />
       </div>

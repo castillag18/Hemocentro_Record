@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { handlePrismaRouteError, withAuth } from "@/lib/api";
-import { getEligibleDonors, serializeEligible } from "@/lib/eligibility";
+import {
+  estimatePendingReminderCount,
+  getEligiblePreview,
+  getReminderIntervalSettings,
+  serializeEligible,
+} from "@/lib/eligibility";
 import { endOfDay, startOfDay } from "@/lib/dates";
 
 export async function GET() {
@@ -12,9 +17,9 @@ export async function GET() {
   const todayEnd = endOfDay(new Date());
 
   try {
-    const [{ eligible, reminderDays }, totalDonors, donationsToday, sentToday, failedToday] =
+    const intervalSettings = await getReminderIntervalSettings();
+    const [totalDonors, donationsToday, sentToday, failedToday, pendingReminders, eligible] =
       await Promise.all([
-        getEligibleDonors(),
         prisma.donor.count({ where: { active: true } }),
         prisma.donor.count({
           where: {
@@ -27,16 +32,18 @@ export async function GET() {
         prisma.reminderLog.count({
           where: { status: "fallido", sentAt: { gte: todayStart, lte: todayEnd } },
         }),
+        estimatePendingReminderCount(),
+        getEligiblePreview(8),
       ]);
 
     return NextResponse.json({
-      reminderDays,
+      reminderDays: intervalSettings.reminderDays,
       totalDonors,
       donationsToday,
-      pendingReminders: eligible.length,
+      pendingReminders,
       sentToday,
       failedToday,
-      eligible: eligible.slice(0, 8).map(serializeEligible),
+      eligible: eligible.map(serializeEligible),
     });
   } catch (error) {
     return handlePrismaRouteError(error);
