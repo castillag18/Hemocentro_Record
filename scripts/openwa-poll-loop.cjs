@@ -27,11 +27,18 @@ function runOnce() {
   const out = `${result.stdout || ""}${result.stderr || ""}`.trim();
   if (out) console.log(out.slice(-1200));
 
+  const openWaUnreachable = /no se pudo contactar OpenWA|operation was aborted/i.test(out);
   const sessionNotReady =
     /estado sesión: (failed|initializing|authenticating|connecting|qr_ready)/i.test(out) &&
     result.status !== 0;
 
-  if (sessionNotReady) {
+  if (openWaUnreachable) {
+    sessionFailStreak = Math.min(sessionFailStreak + 1, 6);
+    nextDelayMs = Math.min(baseIntervalMs * 2 ** sessionFailStreak, maxBackoffMs);
+    console.warn(
+      `[${ts}] OpenWA lento/caído (¿RAM?) — próximo intento en ${Math.round(nextDelayMs / 1000)}s`,
+    );
+  } else if (sessionNotReady) {
     sessionFailStreak = Math.min(sessionFailStreak + 1, 6);
     nextDelayMs = Math.min(baseIntervalMs * 2 ** sessionFailStreak, maxBackoffMs);
     console.warn(

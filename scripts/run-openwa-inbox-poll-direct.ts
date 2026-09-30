@@ -15,7 +15,7 @@ require("./load-env.cjs").loadEnv();
 async function preflightOpenWa(settings: Awaited<ReturnType<typeof getSettings>>) {
   const base = (settings.whatsappOpenWaUrl || "http://localhost:2785").replace(/\/$/, "");
   const apiKey = settings.whatsappOpenWaApiKey || process.env.WHATSAPP_OPENWA_API_KEY || "";
-  const timeoutMs = Math.min(getOpenWaFetchTimeoutMs(), 10_000);
+  const timeoutMs = Math.min(getOpenWaFetchTimeoutMs(), 30_000);
   console.log("OpenWA URL:", base);
 
   const controller = new AbortController();

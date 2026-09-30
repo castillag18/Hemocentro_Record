@@ -37,8 +37,12 @@ async function main() {
       `${base}/api/sessions/${encodeURIComponent(sessionUuid)}/force-kill`,
       key,
       30_000,
+      { method: "POST" },
     );
     console.log("force-kill:", kill.status, JSON.stringify(kill.data).slice(0, 200));
+    if (!kill.ok && kill.status !== 404) {
+      console.warn("force-kill no OK — continúa con start si la sesión quedó colgada");
+    }
 
     await new Promise((r) => setTimeout(r, 5000));
 
@@ -46,6 +50,7 @@ async function main() {
       `${base}/api/sessions/${encodeURIComponent(sessionUuid)}/start`,
       key,
       60_000,
+      { method: "POST" },
     );
     console.log("start:", start.status, JSON.stringify(start.data).slice(0, 200));
 

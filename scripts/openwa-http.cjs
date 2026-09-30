@@ -15,12 +15,15 @@ function openWaHeaders(apiKey) {
   return headers;
 }
 
-async function fetchOpenWa(url, apiKey, ms = timeoutMs()) {
+async function fetchOpenWa(url, apiKey, ms = timeoutMs(), init = {}) {
+  const method = init.method || "GET";
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
   try {
     const res = await fetch(url, {
+      method,
       headers: openWaHeaders(apiKey),
+      body: init.body,
       signal: controller.signal,
     });
     const data = await res.json().catch(() => ({}));
