@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { listDonorsPaginated } from "@/lib/donor-list";
 import { prisma } from "@/lib/prisma";
 import { jsonError, withAuth } from "@/lib/api";
 import { BLOOD_TYPES, CHANNELS, DONATION_TYPES, GENDERS } from "@/lib/constants";
@@ -30,31 +31,16 @@ export async function GET(request: Request) {
   const page = Math.max(1, Number(searchParams.get("page") ?? 1));
   const pageSize = Math.min(100, Math.max(10, Number(searchParams.get("pageSize") ?? 25)));
 
-  const where = {
-    ...(q
-      ? {
-          OR: [
-            { name: { contains: q } },
-            { documentId: { contains: q } },
-            { email: { contains: q } },
-            { phone: { contains: q } },
-          ],
-        }
-      : {}),
-    ...(bloodType ? { bloodType } : {}),
-  };
+  const result = await listDonorsPaginated({ q, bloodType, page, pageSize });
 
-  const [total, donors] = await Promise.all([
-    prisma.donor.count({ where }),
-    prisma.donor.findMany({
-      where,
-      orderBy: { name: "asc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    }),
-  ]);
-
-  return NextResponse.json({ total, page, pageSize, donors });
+  return NextResponse.json({
+    total: result.total,
+    page: result.page,
+    pageSize: result.pageSize,
+    hasMore: result.hasMore,
+    totalExact: result.totalExact,
+    donors: result.donors,
+  });
 }
 
 export async function POST(request: Request) {

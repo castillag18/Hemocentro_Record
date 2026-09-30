@@ -20,6 +20,8 @@ type ListResponse = {
   total: number;
   page: number;
   pageSize: number;
+  hasMore?: boolean;
+  totalExact?: boolean;
   donors: DonorRecord[];
 };
 
@@ -47,8 +49,22 @@ function DonantesContent() {
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
+    const trimmed = debouncedQ.trim();
+    if (trimmed.length === 1) {
+      setData({
+        total: 0,
+        page: 1,
+        pageSize,
+        hasMore: false,
+        totalExact: true,
+        donors: [],
+      });
+      setInitialLoading(false);
+      setLoading(false);
+      return;
+    }
     const params = new URLSearchParams({
-      q: debouncedQ,
+      q: trimmed,
       page: String(page),
       pageSize: String(pageSize),
     });
@@ -78,7 +94,10 @@ function DonantesContent() {
     if (incomingQ) setQ(incomingQ);
   }, [searchParams, router]);
 
-  const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / (data?.pageSize ?? pageSize)));
+  const totalExact = data?.totalExact !== false;
+  const totalPages = totalExact
+    ? Math.max(1, Math.ceil((data?.total ?? 0) / (data?.pageSize ?? pageSize)))
+    : page + (data?.hasMore ? 1 : 0);
 
   return (
     <div>
@@ -119,7 +138,7 @@ function DonantesContent() {
             <Icon name="search" className="absolute left-sm top-1/2 -translate-y-1/2 text-secondary" />
             <input
               className="w-full pl-xl pr-sm py-sm border border-outline-variant rounded-lg outline-none focus:border-primary"
-              placeholder="Buscar por nombre o cédula..."
+              placeholder="Buscar (mín. 2 caracteres): nombre, cédula, teléfono o correo"
               value={q}
               onChange={(e) => {
                 setPage(1);
@@ -220,6 +239,8 @@ function DonantesContent() {
           totalPages={totalPages}
           total={data?.total ?? 0}
           pageSize={data?.pageSize ?? pageSize}
+          hasMore={data?.hasMore}
+          totalExact={totalExact}
           onPageChange={setPage}
         />
       </div>

@@ -42,6 +42,8 @@ model Donor {
   @@index([active, accepted, lastDonationDate])
   @@index([bloodType])
   @@index([name])
+  @@index([phone])
+  @@fulltext([name, documentId])
 }
 
 model Settings {
