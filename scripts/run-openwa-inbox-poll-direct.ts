@@ -72,9 +72,11 @@ async function preflightOpenWa(settings: Awaited<ReturnType<typeof getSettings>>
     const status = String(sessionData.status ?? sessionData.state ?? "desconocido");
     console.log("preflight: estado sesión:", status);
     if (!READY.has(status)) {
-      console.error("\n❌ WhatsApp no está vinculado (sesión no lista).");
-      console.error("→ Configuración → Canales → Generar QR y escanear");
+      console.error(`\n❌ Sesión OpenWA en estado «${status}» (se requiere «ready»).`);
+      console.error("→ docker restart openwa-api");
       console.error("→ npm run openwa:restart-session");
+      console.error("→ Configuración → Canales → Generar QR y escanear");
+      console.error("→ npm run openwa:check");
       process.exit(1);
     }
   } catch (err) {
