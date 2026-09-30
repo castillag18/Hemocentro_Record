@@ -75,6 +75,12 @@ export async function ensureOpenWaQr(options: {
     };
   }
 
+  if (state === "failed") {
+    throw new Error(
+      "Sesión en «failed». En la VM ejecute una vez: npm run openwa:restart-session, luego «Generar código QR». No repita docker restart en bucle.",
+    );
+  }
+
   if (!QR_PENDING_STATUSES.has(state)) {
     try {
       await startOpenWaSession(options);

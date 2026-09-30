@@ -4,6 +4,7 @@ import { getOpenWaFetchTimeoutMs } from "../lib/fetch-timeout";
 import { pollOpenWaInbox } from "../lib/openwa-inbox-poll";
 import { openWaHeaders, resolveOpenWaSessionUuid } from "../lib/openwa-session";
 import { getSettings } from "../lib/settings";
+import { assertDatabaseReachable } from "../lib/db-preflight";
 import { prisma } from "../lib/prisma";
 
 const READY = new Set(["ready", "CONNECTED", "connected", "open"]);
@@ -85,10 +86,16 @@ async function preflightOpenWa(settings: Awaited<ReturnType<typeof getSettings>>
     );
     if (!READY.has(status)) {
       console.error(`\n❌ Sesión OpenWA en estado «${status}» (se requiere «ready»).`);
-      console.error("→ docker restart openwa-api");
-      console.error("→ npm run openwa:restart-session");
-      console.error("→ Configuración → Canales → Generar QR y escanear");
-      console.error("→ npm run openwa:check");
+      const transient = new Set(["initializing", "authenticating", "connecting", "qr_ready"]);
+      if (transient.has(status)) {
+        console.error("→ Espere 2–5 min; NO reinicie Docker en bucle (empeora la reconexión).");
+        console.error("→ Si sigue así: npm run openwa:restart-session → escanee QR una vez.");
+      } else if (status === "failed") {
+        console.error("→ npm run openwa:restart-session (una vez) → Configuración → Generar QR");
+        console.error("→ Revise MySQL estable (nc -zv 192.168.1.4 3306) y memoria del contenedor OpenWA.");
+      } else {
+        console.error("→ npm run openwa:check  ·  Configuración → Canales → Generar QR");
+      }
       process.exit(1);
     }
   } catch (err) {
@@ -101,8 +108,28 @@ async function preflightOpenWa(settings: Awaited<ReturnType<typeof getSettings>>
   }
 }
 
+async function preflightDatabase() {
+  try {
+    await assertDatabaseReachable();
+    console.log("preflight: MySQL OK");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("preflight: MySQL no disponible — poll omitido (sin llamadas a bandeja OpenWA)");
+    console.error(`→ ${msg.split("\n")[0]}`);
+    console.error("→ Desde VM: nc -zv 192.168.1.4 3306  ·  npm run db:check");
+    debugOpenWaLog(
+      "run-openwa-inbox-poll-direct.ts:preflight-db",
+      "mysql unreachable skip poll",
+      { hint: msg.split("\n")[0]?.slice(0, 120) },
+      "H5",
+    );
+    process.exit(0);
+  }
+}
+
 async function main() {
   console.log("mode: direct (BD + OpenWA, sin HTTP a la app)");
+  await preflightDatabase();
   const settings = await getSettings();
   await preflightOpenWa(settings);
   const result = await pollOpenWaInbox(settings);

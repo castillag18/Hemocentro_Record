@@ -435,6 +435,9 @@ npm run import:donors:huav
 | Sin permiso `CREATE DATABASE` | Normal en BD `huav` corporativa; la BD ya debe existir |
 | OpenWA: session not found | Configuración → nombre sesión `default` → Generar QR |
 | Webhook no llega | Use sondeo cron (`openwa:poll-inbox`); webhook es opcional en Docker/LAN |
+| Sesión `ready` → `failed` | Revise MySQL estable (`Can't reach 192.168.1.4` en poll); una vez `npm run openwa:restart-session` + QR; no `docker restart` en bucle |
+| OpenWA inestable | Contenedor con `--shm-size=2g` y volumen persistente para datos de sesión; PM2 `openwa-poll` ya hace backoff si no está `ready` |
+| Webhook URL en Linux | Preferir `OPENWA_WEBHOOK_URL=http://172.17.0.1:3000/api/webhooks/openwa` (no `host.docker.internal` salvo Docker Desktop) |
 | Puerto 3000 ocupado | `PORT=3001` en `.env` y reinicie |
 | Google OAuth: IP no válida | Use túnel HTTPS, localhost o cuenta de servicio (sección 10) |
 | Calendar conectado pero sin eventos | `npm run google:test-calendar` o cuenta de servicio + calendario compartido |
