@@ -16,6 +16,8 @@
     "db:check:huav": "node scripts/check-huav-db.cjs",
     "server:diagnose": "node scripts/server-diagnose.cjs",
     "server:recover": "node scripts/recover-stack.cjs",
+    "server:recover-oom": "node scripts/recover-after-oom.cjs",
+    "server:pm2-start": "node scripts/start-production-pm2.cjs",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:push": "node scripts/guard-app-database.cjs && prisma db push",

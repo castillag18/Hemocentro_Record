@@ -244,7 +244,31 @@ pm2 save
 
 ---
 
-## 8. VM con poca RAM (error heap out of memory)
+## 8. OOM killer (kernel mata `node` / `chrome`)
+
+Si en `dmesg` o la consola aparece **Out of memory: Killed process … (node)** o **(chrome)**:
+
+1. Tras subir RAM en Hyper-V, **reinicie la VM** y compruebe: `free -h` (debe verse ~3,8 Gi total).
+2. PM2 puede quedar vacío: `pm2 list` → use los pasos de abajo, no solo `pm2 restart`.
+3. **`npm run start` sin build** falla con *Could not find a production build* → ejecute **`npm run build`** antes.
+
+```bash
+cd /opt/Hemocentro_Record
+npm run server:recover-oom   # checklist en pantalla
+docker stop openwa-api       # opcional, libera RAM para compilar
+export NODE_OPTIONS=--max-old-space-size=3072
+npm run build
+npm run server:pm2-start
+docker start openwa-api
+npm run openwa:pm2-start-poll
+pm2 save
+```
+
+Contenedor OpenWA: use `--shm-size=2g` y límite de memoria razonable; Chrome + Next + build a la vez en 4 GB suele provocar OOM.
+
+---
+
+## 9. VM con poca RAM (error heap out of memory)
 
 Si `npm run build` falla con `JavaScript heap out of memory`:
 
@@ -277,7 +301,7 @@ npm run db:push:retry
 
 ---
 
-## 9. Error 403 en `/_next/static/chunks` (modo desarrollo)
+## 10. Error 403 en `/_next/static/chunks` (modo desarrollo)
 
 Al abrir la app por IP (`http://192.168.1.112:3000`), Next.js 16 bloquea recursos dev por seguridad.
 
@@ -298,7 +322,7 @@ En **producción** (`npm run build` + `npm run start`) este bloqueo no aplica.
 
 ---
 
-## 10. Google Calendar en red LAN (sin dominio público)
+## 11. Google Calendar en red LAN (sin dominio público)
 
 **Google Cloud no permite** registrar `http://192.168.1.112:3000` en un cliente OAuth tipo *Aplicación web*. Solo acepta:
 
@@ -350,7 +374,7 @@ No requiere redirect URI ni túnel.
 
 ---
 
-## 11. Permisos MySQL — `Access denied` al importar HUAV
+## 12. Permisos MySQL — `Access denied` al importar HUAV
 
 Si `npm run db:check:huav` muestra:
 
@@ -420,7 +444,7 @@ npm run import:donors:huav
 
 ---
 
-## 12. Solución de problemas
+## 13. Solución de problemas
 
 | Problema | Solución |
 |---|---|
@@ -447,13 +471,17 @@ npm run import:donors:huav
 
 ---
 
-## 13. Referencia rápida
+## 14. Referencia rápida
 
 ```bash
 npm run db:ensure          # Solo crear/verificar BD
 npm run db:check           # Probar conexión Prisma (hemocentro_app)
 npm run db:check:huav      # Probar lectura BD corporativa huav
+npm run server:recover-oom # Tras OOM / PM2 vacío
+npm run server:pm2-start   # next start en PM2 (requiere npm run build)
 npm run server:diagnose    # Diagnóstico completo en servidor
+npm run server:recover-oom # Checklist tras OOM / sin .next
+npm run server:pm2-start   # PM2 huav (después de npm run build)
 npm run import:donors:huav # Importar donantes desde huav
 npm run openwa:diagnose    # Mensajes WhatsApp + identificación donante
 npm run openwa:poll-inbox  # Procesar respuestas «Sí» manualmente
