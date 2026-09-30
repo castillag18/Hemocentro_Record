@@ -4,6 +4,7 @@ import { buildTemplateVars, interpolate } from "./templates";
 import { sendEmail, smtpConfigured } from "./email";
 import { persistDonorWhatsAppChatId } from "./openwa-contacts";
 import { buildWhatsAppUrl, openWaConfigured, sendOpenWaMessage, sendWhatsAppApiMessage } from "./whatsapp";
+import { openWaAfterSendPause } from "./openwa-queue";
 import { getWhatsappDailyRemaining, getWhatsappSentTodayCount } from "./whatsapp-limit";
 import { startOfDay } from "./dates";
 import type { TemplateKind } from "./constants";
@@ -161,10 +162,12 @@ export async function sendRemindersToDonors(options: {
           await logReminder(donor, "whatsapp", "enviado", templateKind, referenceKey);
           result.whatsappOpenWa.sent += 1;
           whatsappSentThisBatch += 1;
+          await openWaAfterSendPause();
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : "Error OpenWA";
           result.whatsappOpenWa.failed.push({ id: donor.id, name: donor.name, error: errorMessage });
           await logReminder(donor, "whatsapp", "fallido", templateKind, referenceKey, errorMessage);
+          await openWaAfterSendPause();
         }
         continue;
       }

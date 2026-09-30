@@ -464,6 +464,7 @@ npm run import:donors:huav
 | Prisma P2024 pool timeout | Añada `?connection_limit=10&pool_timeout=30` a `DATABASE_URL`; no deje dos `next start` + libere RAM (OpenWA/Chromium consume mucho) |
 | RAM >90 % / CPU 100 % | OpenWA no responde a `/api/health` → sesión `initializing`; añada swap o suba RAM; `OPENWA_FETCH_TIMEOUT_MS=45000` |
 | OpenWA inestable | Contenedor con `--shm-size=2g` y volumen persistente para datos de sesión; PM2 `openwa-poll` ya hace backoff si no está `ready` |
+| `ThrottlerException` en `/api/openwa` | Límite del **servicio OpenWA** (no la sesión WhatsApp). Cola `OPENWA_MIN_INTERVAL_MS`; no sondear bandeja desde el navegador (use PM2 `openwa-poll`) |
 | Webhook URL en Linux | Preferir `OPENWA_WEBHOOK_URL=http://172.17.0.1:3000/api/webhooks/openwa` (no `host.docker.internal` salvo Docker Desktop) |
 | Puerto 3000 ocupado | `PORT=3001` en `.env` y reinicie |
 | Google OAuth: IP no válida | Use túnel HTTPS, localhost o cuenta de servicio (sección 10) |

@@ -1,4 +1,4 @@
-import { fetchWithTimeout } from "./fetch-timeout";
+import { openWaFetchQueued } from "./openwa-queue";
 import {
   isOpenWaSessionUuid,
   listOpenWaSessions,
@@ -9,7 +9,7 @@ import {
 } from "./openwa-session";
 
 function openWaFetch(input: RequestInfo | URL, init?: RequestInit) {
-  return fetchWithTimeout(input, { ...init, timeoutMs: 8000 });
+  return openWaFetchQueued(input, { ...init, timeoutMs: 8000 });
 }
 import { resolveOpenWaWebhookRegisterCandidates } from "./openwa-webhook-url";
 import {

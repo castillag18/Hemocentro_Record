@@ -17,7 +17,7 @@ import {
   startOpenWaSession,
   testOpenWaConnection,
 } from "@/lib/openwa";
-import { fetchWithTimeout } from "@/lib/fetch-timeout";
+import { openWaFetchQueued } from "@/lib/openwa-queue";
 import { pollOpenWaInbox } from "@/lib/openwa-inbox-poll";
 
 type OpenWaBody = {
@@ -94,6 +94,9 @@ function friendlyOpenWaError(message: string) {
   }
   if (/destination address is not allowed|ssrf/i.test(message)) {
     return message;
+  }
+  if (/throttler|too many requests/i.test(message)) {
+    return "OpenWA limitó las peticiones (Throttler). Espere 1–2 minutos. La sesión puede seguir «ready» en el panel de OpenWA; evite abrir Configuración con muchas pestañas a la vez.";
   }
   return message;
 }
@@ -221,7 +224,8 @@ export async function POST(request: Request) {
         sentToday,
         limit,
         webhookUrl,
-        inboxPollingEnabled: status.status.toLowerCase() === "ready",
+        inboxPollingEnabled: false,
+        serverInboxPollRecommended: true,
       });
     }
 
@@ -237,7 +241,7 @@ export async function POST(request: Request) {
       if (status.status.toLowerCase() === "ready") {
         const base = opts.baseUrl.replace(/\/$/, "");
         const candidates = resolveOpenWaWebhookRegisterCandidates();
-        const list = await fetchWithTimeout(
+        const list = await openWaFetchQueued(
           `${base}/api/sessions/${encodeURIComponent(status.sessionUuid)}/webhooks`,
           { headers: { "X-API-Key": opts.apiKey }, timeoutMs: 8000 },
         )

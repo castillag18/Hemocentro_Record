@@ -1,3 +1,4 @@
+import { openWaFetchQueued } from "./openwa-queue";
 import { normalizePhone } from "./whatsapp";
 import { openWaHeaders, resolveOpenWaSessionUuid } from "./openwa-session";
 
@@ -29,7 +30,14 @@ function formatOpenWaError(data: { message?: string | string[]; error?: string }
   if (/internal server error/i.test(raw)) {
     return "OpenWA no pudo entregar el mensaje por WhatsApp. Ejecute npm run openwa:restart-session, escanee el QR y vuelva a intentar.";
   }
+  if (/throttler|too many requests/i.test(raw)) {
+    return "OpenWA limitó las peticiones. Espere 1–2 min; la sesión puede seguir conectada en el admin de OpenWA.";
+  }
   return raw;
+}
+
+async function openWaFetch(input: RequestInfo | URL, init?: RequestInit) {
+  return openWaFetchQueued(input, init);
 }
 
 export async function resolveOpenWaChatId(
@@ -39,7 +47,7 @@ export async function resolveOpenWaChatId(
   if (!normalized) throw new Error("Teléfono inválido para OpenWA");
 
   const base = ctx.baseUrl.replace(/\/$/, "");
-  const res = await fetch(
+  const res = await openWaFetch(
     `${base}/api/sessions/${encodeURIComponent(ctx.sessionUuid)}/contacts/check/${normalized}`,
     { headers: openWaHeaders(ctx.apiKey) },
   );
@@ -80,7 +88,7 @@ export async function resolveLatestIncomingMessageId(
       sessionId: ctx.sessionId,
     }));
   const base = ctx.baseUrl.replace(/\/$/, "");
-  const res = await fetch(`${base}/api/sessions/${encodeURIComponent(uuid)}/messages?limit=30`, {
+  const res = await openWaFetch(`${base}/api/sessions/${encodeURIComponent(uuid)}/messages?limit=30`, {
     headers: openWaHeaders(ctx.apiKey),
   });
   const data = await parseOpenWaJson(res);
@@ -99,7 +107,7 @@ async function confirmRecentOutgoingDelivery(
   const since = Date.now() - 30_000;
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    const res = await fetch(`${base}/api/sessions/${encodeURIComponent(ctx.sessionUuid)}/messages?limit=20`, {
+    const res = await openWaFetch(`${base}/api/sessions/${encodeURIComponent(ctx.sessionUuid)}/messages?limit=20`, {
       headers: openWaHeaders(ctx.apiKey),
     });
     const data = await parseOpenWaJson(res);
@@ -135,7 +143,7 @@ async function verifyRecentOutgoingMessage(
 ) {
   const base = ctx.baseUrl.replace(/\/$/, "");
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const res = await fetch(`${base}/api/sessions/${encodeURIComponent(ctx.sessionUuid)}/messages?limit=12`, {
+    const res = await openWaFetch(`${base}/api/sessions/${encodeURIComponent(ctx.sessionUuid)}/messages?limit=12`, {
       headers: openWaHeaders(ctx.apiKey),
     });
     const data = await parseOpenWaJson(res);
@@ -166,7 +174,7 @@ export async function sendOpenWaReplyMessage(
     sessionId: ctx.sessionId,
   });
   const base = ctx.baseUrl.replace(/\/$/, "");
-  const res = await fetch(`${base}/api/sessions/${encodeURIComponent(sessionUuid)}/messages/reply`, {
+  const res = await openWaFetch(`${base}/api/sessions/${encodeURIComponent(sessionUuid)}/messages/reply`, {
     method: "POST",
     headers: openWaHeaders(ctx.apiKey),
     body: JSON.stringify({
@@ -239,8 +247,7 @@ export async function sendOpenWaTextMessage(
     }
   }
 
-  const { fetchWithTimeout } = await import("./fetch-timeout");
-  const res = await fetchWithTimeout(
+  const res = await openWaFetch(
     `${base}/api/sessions/${encodeURIComponent(sessionUuid)}/messages/send-text`,
     {
       method: "POST",

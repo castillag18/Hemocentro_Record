@@ -1,5 +1,6 @@
 import { debugOpenWaLog } from "./debug-openwa-log";
-import { fetchWithTimeout, getOpenWaFetchTimeoutMs } from "./fetch-timeout";
+import { getOpenWaFetchTimeoutMs } from "./fetch-timeout";
+import { openWaFetchQueued } from "./openwa-queue";
 import { prisma } from "./prisma";
 import { resolveOpenWaContactPhone } from "./openwa-contacts";
 import { openWaHeaders, resolveOpenWaSessionUuid } from "./openwa-session";
@@ -86,7 +87,7 @@ async function fetchRecentIncomingMessages(settings: Awaited<ReturnType<typeof g
 
   let res: Response;
   try {
-    res = await fetchWithTimeout(
+    res = await openWaFetchQueued(
       `${base}/api/sessions/${encodeURIComponent(sessionUuid)}/messages?limit=40`,
       { headers: openWaHeaders(ctx.apiKey), timeoutMs: getOpenWaFetchTimeoutMs() },
     );

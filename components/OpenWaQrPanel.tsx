@@ -133,7 +133,7 @@ export function OpenWaQrPanel({
   useEffect(() => {
     if (!enabled || config.whatsappMode !== "openwa") return;
     void refresh();
-    const timer = setInterval(() => void refresh(), 60000);
+    const timer = setInterval(() => void refresh(), 120_000);
     return () => clearInterval(timer);
   }, [enabled, config.whatsappMode, refresh]);
 
@@ -173,12 +173,7 @@ export function OpenWaQrPanel({
     }
   }, [enabled, config.whatsappMode, status, payload]);
 
-  useEffect(() => {
-    if (!enabled || status.toLowerCase() !== "ready") return;
-    void pollInbox();
-    const timer = setInterval(() => void pollInbox(), 45_000);
-    return () => clearInterval(timer);
-  }, [enabled, status, pollInbox]);
+  // Sondeo de bandeja: solo manual aquí; en servidor use PM2 openwa-poll (evita Throttler en OpenWA).
 
   useEffect(() => {
     if (status.toLowerCase() !== "qr_ready" || !enabled) return;
@@ -360,8 +355,8 @@ export function OpenWaQrPanel({
         <div className="rounded-lg border border-outline-variant bg-surface-container-lowest p-3 space-y-2">
           <p className="text-body-sm font-medium text-on-surface">Respuestas de donantes (agendamiento)</p>
           <p className="text-body-xs text-secondary">
-            Las respuestas «Sí» se procesan por sondeo en servidor (cron o PM2). Mientras esta
-            pantalla esté abierta, también se consulta cada 45 s.
+            Las respuestas «Sí» se procesan en el servidor (PM2 «openwa-poll» o cron). Use «Procesar
+            respuestas ahora» solo si hace falta; no deje muchas pestañas de Configuración abiertas.
           </p>
           {lastPollSummary ? (
             <p className="text-body-xs text-secondary">Último sondeo: {lastPollSummary}</p>
