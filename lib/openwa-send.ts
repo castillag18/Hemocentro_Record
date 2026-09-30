@@ -36,7 +36,10 @@ function formatOpenWaError(data: { message?: string | string[]; error?: string }
   return raw;
 }
 
-async function openWaFetch(input: RequestInfo | URL, init?: RequestInit) {
+async function openWaFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit & { timeoutMs?: number },
+) {
   return openWaFetchQueued(input, init);
 }
 
