@@ -121,6 +121,7 @@ model ReminderLog {
   donationDateRef DateTime
 
   @@index([donorId, messageKind, referenceKey])
+  @@index([donorId, messageKind, status])
 }
 
 model Appointment {

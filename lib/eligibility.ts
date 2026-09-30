@@ -7,6 +7,7 @@ import {
   pickIntervalSettings,
   type ReminderIntervalSettings,
 } from "./donation-intervals";
+import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 
 export { computeNextDonationDateForDonor as computeNextDonationDate } from "./donation-intervals";
@@ -208,6 +209,99 @@ export type PaginatedEligibleResult = {
   totalExact: boolean;
 };
 
+/** Filtro por estado de recordatorio en SQL (evita escanear 100k+ filas en memoria). */
+function reminderStatusSqlFilter(status: string): Prisma.Sql {
+  const sentForCycle = Prisma.sql`EXISTS (
+    SELECT 1 FROM ReminderLog r
+    WHERE r.donorId = d.id
+      AND r.messageKind = 'reminder'
+      AND r.status = 'enviado'
+      AND DATE(r.donationDateRef) = DATE(d.lastDonationDate)
+  )`;
+  const failedForCycle = Prisma.sql`EXISTS (
+    SELECT 1 FROM ReminderLog r
+    WHERE r.donorId = d.id
+      AND r.messageKind = 'reminder'
+      AND r.status = 'fallido'
+      AND DATE(r.donationDateRef) = DATE(d.lastDonationDate)
+  )`;
+
+  if (status === "enviado") return Prisma.sql`AND ${sentForCycle}`;
+  if (status === "fallido") return Prisma.sql`AND ${failedForCycle} AND NOT (${sentForCycle})`;
+  if (status === "pendiente") return Prisma.sql`AND NOT (${sentForCycle})`;
+  return Prisma.empty;
+}
+
+async function donorIdsByReminderSql(options: {
+  status: string;
+  bloodType?: string;
+  minLastDonation: Date;
+  skip: number;
+  take: number;
+}): Promise<string[]> {
+  const blood = options.bloodType?.trim()
+    ? Prisma.sql`AND d.bloodType = ${options.bloodType.trim()}`
+    : Prisma.empty;
+  const statusFilter = reminderStatusSqlFilter(options.status);
+
+  const rows = await prisma.$queryRaw<{ id: string }[]>`
+    SELECT d.id
+    FROM Donor d
+    WHERE d.active = true
+      AND d.accepted = true
+      AND d.lastDonationDate <= ${options.minLastDonation}
+      ${blood}
+      ${statusFilter}
+    ORDER BY d.lastDonationDate ASC
+    LIMIT ${options.take}
+    OFFSET ${options.skip}
+  `;
+  return rows.map((row) => row.id);
+}
+
+async function countDonorsByReminderSql(options: {
+  status: string;
+  bloodType?: string;
+  minLastDonation: Date;
+}): Promise<number> {
+  const blood = options.bloodType?.trim()
+    ? Prisma.sql`AND d.bloodType = ${options.bloodType.trim()}`
+    : Prisma.empty;
+  const statusFilter = reminderStatusSqlFilter(options.status);
+  const rows = await prisma.$queryRaw<[{ cnt: bigint }]>`
+    SELECT COUNT(*) AS cnt
+    FROM Donor d
+    WHERE d.active = true
+      AND d.accepted = true
+      AND d.lastDonationDate <= ${options.minLastDonation}
+      ${blood}
+      ${statusFilter}
+  `;
+  return Number(rows[0]?.cnt ?? 0);
+}
+
+async function loadEligibleFromDonorIds(
+  ids: string[],
+  intervalSettings: ReminderIntervalSettings,
+  includeSent: boolean,
+  status: string,
+): Promise<EligibleDonor[]> {
+  if (!ids.length) return [];
+  const donors = await prisma.donor.findMany({
+    where: { id: { in: ids } },
+    include: { reminderLogs: DONOR_REMINDER_LOGS },
+  });
+  const byId = new Map(donors.map((donor) => [donor.id, donor]));
+  const eligible: EligibleDonor[] = [];
+  for (const id of ids) {
+    const donor = byId.get(id);
+    if (!donor) continue;
+    const item = buildEligibleDonor(donor, intervalSettings, includeSent);
+    if (item && matchesReminderStatus(item, status)) eligible.push(item);
+  }
+  return eligible;
+}
+
 /** Lista paginada sin cargar 100k donantes en memoria. */
 export async function getEligibleDonorsPaginated(options: {
   page: number;
@@ -257,44 +351,66 @@ export async function getEligibleDonorsPaginated(options: {
     };
   }
 
-  const BATCH = 250;
-  const targetStart = (page - 1) * pageSize;
+  const skip = (page - 1) * pageSize;
   const wantCount = pageSize + 1;
-  const pageItems: EligibleDonor[] = [];
-  let matchedIndex = 0;
-  let dbSkip = 0;
 
-  while (pageItems.length < wantCount) {
-    const batch = await prisma.donor.findMany({
+  if (status === "all") {
+    const donors = await prisma.donor.findMany({
       where: baseWhere,
       orderBy: { lastDonationDate: "asc" },
-      skip: dbSkip,
-      take: BATCH,
+      skip,
+      take: wantCount + 4,
       include: { reminderLogs: DONOR_REMINDER_LOGS },
     });
-    if (!batch.length) break;
-    dbSkip += batch.length;
-
-    for (const donor of batch) {
-      const item = buildEligibleDonor(donor, intervalSettings, includeSent);
-      if (!item || !matchesReminderStatus(item, status)) continue;
-      if (matchedIndex >= targetStart) pageItems.push(item);
-      matchedIndex += 1;
-      if (pageItems.length >= wantCount) break;
-    }
-    if (pageItems.length >= wantCount) break;
+    const pageItems = donors
+      .map((donor) => buildEligibleDonor(donor, intervalSettings, true))
+      .filter((item): item is EligibleDonor => item !== null && matchesReminderStatus(item, status));
+    const hasMore = pageItems.length > pageSize;
+    return {
+      reminderDays: intervalSettings.reminderDays,
+      eligible: pageItems.slice(0, pageSize),
+      page,
+      pageSize,
+      total: hasMore ? skip + pageSize + 1 : skip + pageItems.length,
+      hasMore,
+      totalExact: false,
+    };
   }
 
+  const ids = await donorIdsByReminderSql({
+    status,
+    bloodType: options.bloodType,
+    minLastDonation,
+    skip,
+    take: wantCount + 8,
+  });
+  const pageItems = await loadEligibleFromDonorIds(ids, intervalSettings, includeSent, status);
   const hasMore = pageItems.length > pageSize;
+
+  let total = skip + Math.min(pageItems.length, pageSize);
+  let totalExact = false;
+  if (status === "enviado" || status === "fallido") {
+    total = await countDonorsByReminderSql({
+      status,
+      bloodType: options.bloodType,
+      minLastDonation,
+    });
+    totalExact = true;
+  } else if (!hasMore) {
+    total = skip + pageItems.length;
+    totalExact = true;
+  } else {
+    total = skip + pageSize + 1;
+  }
 
   return {
     reminderDays: intervalSettings.reminderDays,
     eligible: pageItems.slice(0, pageSize),
     page,
     pageSize,
-    total: hasMore ? targetStart + pageSize + 1 : targetStart + pageItems.length,
+    total,
     hasMore,
-    totalExact: !hasMore && pageItems.length < pageSize,
+    totalExact,
   };
 }
 
