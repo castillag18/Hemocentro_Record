@@ -1,2 +1,0 @@
-{"sessionId":"dc40f8","runId":"run1","hypothesisId":"H2","location":"openwa-session.ts:resolve","message":"creating new OpenWA session (no name match)","data":{"name":"default","sessionCount":0,"rawSessionId":"1e04954c-672"},"timestamp":1790747922931}
-{"sessionId":"dc40f8","runId":"run1","hypothesisId":"H2","location":"openwa-session.ts:resolve","message":"session resolved by name","data":{"name":"default","uuid":"1670d990","status":null,"sessionCount":1},"timestamp":1790747922935}
