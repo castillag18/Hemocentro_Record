@@ -31,6 +31,7 @@
     "openwa:poll-inbox": "node scripts/run-openwa-inbox-poll.cjs",
     "openwa:install-cron": "node scripts/install-openwa-cron.cjs",
     "openwa:clear-processed": "node scripts/openwa-clear-processed.cjs",
+    "openwa:session-watch": "node scripts/openwa-session-watch.cjs",
     "openwa:poll-loop": "node scripts/openwa-poll-loop.cjs",
     "openwa:diagnose": "tsx scripts/diagnose-openwa-inbound.ts",
     "openwa:poll-inbox:http": "CRON_USE_HTTP=1 node scripts/run-openwa-inbox-poll.cjs",

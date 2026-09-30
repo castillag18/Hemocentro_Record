@@ -1,4 +1,5 @@
 import { createRequire } from "module";
+import { debugOpenWaLog } from "../lib/debug-openwa-log";
 import { getOpenWaFetchTimeoutMs } from "../lib/fetch-timeout";
 import { pollOpenWaInbox } from "../lib/openwa-inbox-poll";
 import { openWaHeaders, resolveOpenWaSessionUuid } from "../lib/openwa-session";
@@ -71,6 +72,17 @@ async function preflightOpenWa(settings: Awaited<ReturnType<typeof getSettings>>
     };
     const status = String(sessionData.status ?? sessionData.state ?? "desconocido");
     console.log("preflight: estado sesión:", status);
+    debugOpenWaLog(
+      "run-openwa-inbox-poll-direct.ts:preflight",
+      "session preflight",
+      {
+        status,
+        uuid: sessionUuid.slice(0, 8),
+        ready: READY.has(status),
+        cwd: process.cwd(),
+      },
+      "H1",
+    );
     if (!READY.has(status)) {
       console.error(`\n❌ Sesión OpenWA en estado «${status}» (se requiere «ready»).`);
       console.error("→ docker restart openwa-api");

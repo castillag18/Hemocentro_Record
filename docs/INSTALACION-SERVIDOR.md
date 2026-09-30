@@ -51,7 +51,7 @@ Desde su PC o directamente en la VM:
 ```bash
 # Opción A — Git
 git clone https://github.com/castillag18/Hemocentro_Record.git
-cd /opt/Hemocentro_Record
+cd /opt/Hemocentro_Record   # ⚠ Siempre ejecute npm desde aquí, NO desde /home/hemoc
 
 # Opción B — Copiar carpeta comprimida
 # scp, SFTP o carpeta compartida de la VM
@@ -226,7 +226,7 @@ Para que la app sobreviva al cerrar la terminal:
 
 ```bash
 npm install -g pm2
-cd /opt/Hemocentro_Record
+cd /opt/Hemocentro_Record   # ⚠ Siempre ejecute npm desde aquí, NO desde /home/hemoc
 npm run build          # requiere ~4 GB RAM o swap (ver sección 8)
 pm2 start npm --name "huav" -- start
 pm2 save
@@ -404,7 +404,7 @@ La última consulta **debe** listar `GRANT SELECT ON \`huav\`.*`.
 ### Paso 4 — Probar desde la VM Linux
 
 ```bash
-cd /opt/Hemocentro_Record
+cd /opt/Hemocentro_Record   # ⚠ Siempre ejecute npm desde aquí, NO desde /home/hemoc
 npm run db:check:huav
 npm run import:donors:huav
 ```
