@@ -24,6 +24,21 @@ export function resolveOpenWaWebhookSecret(stored?: string | null) {
   return process.env.OPENWA_WEBHOOK_SECRET?.trim() || stored?.trim() || "";
 }
 
+/** URL OpenWA desde .env (prioridad) o BD; localhost → 127.0.0.1 (evita ::1 sin listener). */
+export function resolveOpenWaBaseUrl(stored?: string | null): string {
+  const raw =
+    process.env.WHATSAPP_OPENWA_URL?.trim() ||
+    stored?.trim() ||
+    "http://127.0.0.1:2785";
+  try {
+    const url = new URL(raw);
+    if (url.hostname === "localhost") url.hostname = "127.0.0.1";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return "http://127.0.0.1:2785";
+  }
+}
+
 export { resolveOpenWaWebhookUrl } from "./openwa-webhook-url";
 
 function resolveGoogleCalendarId(stored?: string | null) {
@@ -53,8 +68,7 @@ export async function getSettings() {
           ? "openwa"
           : existing.whatsappMode,
       whatsappOpenWaApiKey: resolveOpenWaApiKey(existing.whatsappOpenWaApiKey),
-      whatsappOpenWaUrl:
-        existing.whatsappOpenWaUrl || process.env.WHATSAPP_OPENWA_URL || "http://localhost:2785",
+      whatsappOpenWaUrl: resolveOpenWaBaseUrl(existing.whatsappOpenWaUrl),
       whatsappOpenWaSessionId: resolveOpenWaSessionId(existing.whatsappOpenWaSessionId),
       openwaWebhookSecret: resolveOpenWaWebhookSecret(existing.openwaWebhookSecret),
       googleCalendarId: resolveGoogleCalendarId(existing.googleCalendarId),
@@ -77,7 +91,7 @@ export async function getSettings() {
       whatsappPhoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID ?? "",
       whatsappApiVersion: process.env.WHATSAPP_API_VERSION ?? "v21.0",
       whatsappVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN ?? "",
-      whatsappOpenWaUrl: process.env.WHATSAPP_OPENWA_URL ?? "http://localhost:2785",
+      whatsappOpenWaUrl: resolveOpenWaBaseUrl(null),
       whatsappOpenWaApiKey: process.env.WHATSAPP_OPENWA_API_KEY ?? "",
       whatsappOpenWaSessionId: process.env.WHATSAPP_OPENWA_SESSION_ID ?? DEFAULT_OPENWA_SESSION,
       whatsappDailyLimit: Number(process.env.WHATSAPP_DAILY_LIMIT ?? 1000) || 1000,

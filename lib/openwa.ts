@@ -1,3 +1,4 @@
+import { getOpenWaFetchTimeoutMs } from "./fetch-timeout";
 import { openWaFetchQueued } from "./openwa-queue";
 import {
   isOpenWaSessionUuid,
@@ -9,7 +10,8 @@ import {
 } from "./openwa-session";
 
 function openWaFetch(input: RequestInfo | URL, init?: RequestInit) {
-  return openWaFetchQueued(input, { ...init, timeoutMs: 8000 });
+  const timeoutMs = init?.timeoutMs ?? getOpenWaFetchTimeoutMs();
+  return openWaFetchQueued(input, { ...init, timeoutMs });
 }
 import { resolveOpenWaWebhookRegisterCandidates } from "./openwa-webhook-url";
 import {

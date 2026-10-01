@@ -18,10 +18,11 @@ async function main() {
       process.exit(1);
     }
 
-    const base = (s.whatsappOpenWaUrl || process.env.WHATSAPP_OPENWA_URL || "http://localhost:2785").replace(
+    let base = (process.env.WHATSAPP_OPENWA_URL || s.whatsappOpenWaUrl || "http://127.0.0.1:2785").replace(
       /\/$/,
       "",
     );
+    base = base.replace("://localhost", "://127.0.0.1");
     const storedSession = s.whatsappOpenWaSessionId || process.env.WHATSAPP_OPENWA_SESSION_ID || "default";
     const key = s.whatsappOpenWaApiKey || process.env.WHATSAPP_OPENWA_API_KEY || "";
 

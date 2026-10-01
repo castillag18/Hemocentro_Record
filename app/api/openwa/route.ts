@@ -5,6 +5,7 @@ import {
   openWaEnvConfigured,
   resolveOpenWaApiKey,
   resolveOpenWaSessionId,
+  resolveOpenWaBaseUrl,
   resolveOpenWaWebhookSecret,
   resolveOpenWaWebhookUrl,
 } from "@/lib/settings";
@@ -54,9 +55,11 @@ function resolveOpenWaOpts(settings: Awaited<ReturnType<typeof getSettings>>, bo
 
   const sessionId = resolveOpenWaSessionId(settings.whatsappOpenWaSessionId);
 
+  const baseUrl = resolveOpenWaBaseUrl(settings.whatsappOpenWaUrl);
+
   return {
     opts: {
-      baseUrl: (settings.whatsappOpenWaUrl || "http://localhost:2785").replace(/\/$/, ""),
+      baseUrl,
       apiKey,
       sessionId,
     },
@@ -90,8 +93,8 @@ function friendlyOpenWaError(message: string) {
   if (/session with id.*not found/i.test(message)) {
     return "La sesión OpenWA expiró (reinicio del servicio). Pulse «Generar código QR» de nuevo; se creará una sesión nueva automáticamente.";
   }
-  if (/ECONNREFUSED|fetch failed/i.test(message)) {
-    return "No se pudo conectar con OpenWA. Verifique que el servicio esté activo en la URL configurada.";
+  if (/ECONNREFUSED|fetch failed|ENOTFOUND|ETIMEDOUT|Tiempo de espera/i.test(message)) {
+    return "No se pudo conectar con OpenWA. En la VM: docker ps | grep openwa-api; curl -m 10 http://127.0.0.1:2785/api/health (espere 30–60 s tras docker restart). Revise WHATSAPP_OPENWA_URL en .env (use http://127.0.0.1:2785, no localhost).";
   }
   if (/destination address is not allowed|ssrf/i.test(message)) {
     return message;
@@ -120,6 +123,19 @@ export async function POST(request: Request) {
   const { opts, webhookSecret, limit } = resolved;
 
   try {
+    if (body.action === "health") {
+      const base = opts.baseUrl.replace(/\/$/, "");
+      const res = await openWaFetchQueued(`${base}/api/health`, {
+        headers: { "X-API-Key": opts.apiKey },
+        timeoutMs: 15_000,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return jsonError(`OpenWA /api/health respondió HTTP ${res.status}`);
+      }
+      return NextResponse.json({ ok: true, baseUrl: base, health: data });
+    }
+
     if (body.action === "test") {
       const result = await testOpenWaConnection(opts);
       return NextResponse.json({
@@ -294,6 +310,20 @@ export async function POST(request: Request) {
         "openwa throttle",
         { action: body.action ?? "unknown" },
         "R1",
+      );
+      // #endregion
+    }
+    if (/No se pudo conectar con OpenWA/i.test(friendly)) {
+      // #region agent log
+      debugOpenWaLog(
+        "openwa/route.ts:POST",
+        "openwa unreachable",
+        {
+          action: body.action ?? "unknown",
+          baseUrl: resolveOpenWaBaseUrl(settings.whatsappOpenWaUrl),
+          rawError: raw.slice(0, 120),
+        },
+        "R5",
       );
       // #endregion
     }
