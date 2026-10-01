@@ -1,4 +1,5 @@
 import { fetchWithTimeout } from "./fetch-timeout";
+import { debugOpenWaLog } from "./debug-openwa-log";
 import { prisma } from "./prisma";
 import { normalizePhone } from "./whatsapp";
 import { openWaHeaders, resolveOpenWaSessionUuid } from "./openwa-session";
@@ -8,6 +9,25 @@ type OpenWaContext = {
   apiKey: string;
   sessionId: string;
 };
+
+const MIN_PHONE_DIGITS = 10;
+
+/** Coincidencia estricta (evita falsos positivos con 1 dígito, p. ej. teléfono "0" o "3"). */
+export function donorPhoneDigitsMatch(storedPhone: string | null, phoneDigits: string): boolean {
+  const normalized = normalizePhone(storedPhone);
+  const incoming = normalizePhone(phoneDigits) ?? phoneDigits.replace(/\D/g, "");
+  if (!normalized || !incoming) return false;
+  if (normalized.length < MIN_PHONE_DIGITS || incoming.length < MIN_PHONE_DIGITS) return false;
+  if (normalized === incoming) return true;
+  return normalized.slice(-10) === incoming.slice(-10);
+}
+
+function usablePhoneDigits(raw: string | null | undefined): string {
+  const normalized = normalizePhone(raw ?? undefined);
+  if (normalized && normalized.length >= MIN_PHONE_DIGITS) return normalized;
+  const digits = String(raw ?? "").replace(/\D/g, "");
+  return digits.length >= MIN_PHONE_DIGITS ? digits : "";
+}
 
 export async function resolveOpenWaContactPhone(
   ctx: OpenWaContext,
@@ -34,37 +54,38 @@ export async function resolveOpenWaContactPhone(
     | { phone?: string | number | null; number?: string | number | null }
     | null;
 
+  let digits = "";
   if (typeof data === "string" || typeof data === "number") {
-    const digits = String(data).replace(/\D/g, "");
-    return digits || null;
+    digits = String(data).replace(/\D/g, "");
+  } else {
+    const raw = data?.phone ?? data?.number;
+    if (raw != null) digits = String(raw).replace(/\D/g, "");
   }
 
-  const raw = data?.phone ?? data?.number;
-  if (raw == null) return null;
-  const digits = String(raw).replace(/\D/g, "");
-  return digits || null;
-}
-
-function phoneDigitsMatch(storedPhone: string | null, phoneDigits: string) {
-  const normalized = normalizePhone(storedPhone);
-  if (!normalized || !phoneDigits) return false;
-  return (
-    normalized === phoneDigits ||
-    normalized.endsWith(phoneDigits.slice(-10)) ||
-    phoneDigits.endsWith(normalized.slice(-10))
-  );
+  return digits.length >= MIN_PHONE_DIGITS ? digits : null;
 }
 
 async function matchDonorByPhoneDigits(phoneDigits: string, acceptedOnly: boolean) {
-  if (!phoneDigits) return null;
-  const donors = await prisma.donor.findMany({
+  const incoming = usablePhoneDigits(phoneDigits);
+  if (!incoming) return null;
+
+  const last10 = incoming.slice(-10);
+  const candidates = await prisma.donor.findMany({
     where: {
       active: true,
       ...(acceptedOnly ? { accepted: true } : {}),
       phone: { not: null },
+      OR: [{ phone: { endsWith: last10 } }, { phone: { contains: last10 } }],
     },
+    take: 25,
   });
-  return donors.find((item) => phoneDigitsMatch(item.phone, phoneDigits)) ?? null;
+
+  const matches = candidates.filter((item) => donorPhoneDigitsMatch(item.phone, incoming));
+  if (matches.length === 0) return null;
+  if (matches.length === 1) return matches[0];
+
+  const exact = matches.find((item) => normalizePhone(item.phone) === incoming);
+  return exact ?? null;
 }
 
 export async function findDonorByOpenWaContact(
@@ -75,28 +96,75 @@ export async function findDonorByOpenWaContact(
   const chatId = from.trim();
   if (!chatId) return null;
 
-  const byChatId = await prisma.donor.findFirst({
-    where: { active: true, accepted: true, whatsappChatId: chatId },
-  });
-  if (byChatId) return byChatId;
-
   let phoneDigits = "";
   if (/@c\.us$/i.test(chatId)) {
-    phoneDigits = chatId.replace(/@c\.us$/i, "").replace(/\D/g, "");
+    phoneDigits = usablePhoneDigits(chatId.replace(/@c\.us$/i, ""));
   } else if (chatId.endsWith("@lid")) {
-    const hinted = String(options?.senderPhone ?? "").replace(/\D/g, "");
-    if (hinted.length >= 10) phoneDigits = hinted;
+    phoneDigits = usablePhoneDigits(options?.senderPhone);
     if (!phoneDigits && ctx) {
       const resolved = await resolveOpenWaContactPhone(ctx, chatId);
       if (resolved) phoneDigits = resolved;
     }
   } else {
-    phoneDigits = chatId.replace(/\D/g, "");
+    phoneDigits = usablePhoneDigits(chatId);
   }
 
-  if (!phoneDigits) return null;
+  const byChatId = await prisma.donor.findFirst({
+    where: { active: true, accepted: true, whatsappChatId: chatId },
+  });
+
+  if (byChatId) {
+    if (!phoneDigits || donorPhoneDigitsMatch(byChatId.phone, phoneDigits)) {
+      // #region agent log
+      debugOpenWaLog(
+        "openwa-contacts.ts:findDonor",
+        "matched by whatsappChatId",
+        {
+          chatKind: chatId.endsWith("@lid") ? "lid" : "other",
+          phoneDigitsLen: phoneDigits.length,
+          matchedBy: "whatsappChatId",
+        },
+        "H2",
+      );
+      // #endregion
+      return byChatId;
+    }
+    // #region agent log
+    debugOpenWaLog(
+      "openwa-contacts.ts:findDonor",
+      "whatsappChatId rejected (phone mismatch)",
+      { phoneDigitsLen: phoneDigits.length, matchedBy: "none_chatId_stale" },
+      "H2",
+    );
+    // #endregion
+  }
+
+  if (!phoneDigits) {
+    // #region agent log
+    debugOpenWaLog(
+      "openwa-contacts.ts:findDonor",
+      "no usable phone digits",
+      { chatKind: chatId.endsWith("@lid") ? "lid" : "other" },
+      "H1",
+    );
+    // #endregion
+    return null;
+  }
 
   const donor = await matchDonorByPhoneDigits(phoneDigits, true);
+
+  // #region agent log
+  debugOpenWaLog(
+    "openwa-contacts.ts:findDonor",
+    "phone lookup result",
+    {
+      phoneDigitsLen: phoneDigits.length,
+      matchedBy: donor ? "phone" : "none",
+      donorFound: Boolean(donor),
+    },
+    "H1",
+  );
+  // #endregion
 
   if (donor && chatId.includes("@") && donor.whatsappChatId !== chatId) {
     await prisma.donor
@@ -112,11 +180,14 @@ export async function findDonorByOpenWaContact(
 
 /** Para diagnóstico: donante activo pero no aceptado (no recibe agendamiento). */
 export async function findInactiveAcceptedDonorByPhone(phoneDigits: string) {
-  if (!phoneDigits) return null;
+  if (!usablePhoneDigits(phoneDigits)) return null;
+  const incoming = usablePhoneDigits(phoneDigits);
+  const last10 = incoming.slice(-10);
   const donors = await prisma.donor.findMany({
-    where: { active: true, accepted: false, phone: { not: null } },
+    where: { active: true, accepted: false, phone: { not: null }, OR: [{ phone: { endsWith: last10 } }] },
+    take: 25,
   });
-  return donors.find((item) => phoneDigitsMatch(item.phone, phoneDigits)) ?? null;
+  return donors.find((item) => donorPhoneDigitsMatch(item.phone, incoming)) ?? null;
 }
 
 export async function persistDonorWhatsAppChatId(donorId: string, chatId: string | undefined) {
