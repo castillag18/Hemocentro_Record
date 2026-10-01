@@ -14,7 +14,8 @@ import {
   googleCalendarConfigured,
 } from "./google-calendar";
 import { sendEmail, smtpConfigured } from "./email";
-import { formatDate } from "./dates";
+import { debugOpenWaLog } from "./debug-openwa-log";
+import { formatDateBogota, formatTimeBogota, sitePhoneForMessages } from "./hemocentro-hours";
 import {
   buildSlotSelectionMessage,
   completeBookingSession,
@@ -103,26 +104,31 @@ async function confirmAppointment(options: {
       appointment = {
         scheduledAt: options.scheduledAt,
         googleEventId: null,
-        formattedDate: formatDate(options.scheduledAt),
-        formattedTime: options.scheduledAt.toLocaleTimeString("es-CO", {
-          hour: "2-digit",
-          minute: "2-digit",
-          timeZone: "America/Bogota",
-        }),
+        formattedDate: formatDateBogota(options.scheduledAt),
+        formattedTime: formatTimeBogota(options.scheduledAt),
       };
     }
   } else {
     appointment = {
       scheduledAt: options.scheduledAt,
       googleEventId: null,
-      formattedDate: formatDate(options.scheduledAt),
-      formattedTime: options.scheduledAt.toLocaleTimeString("es-CO", {
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: "America/Bogota",
-      }),
+      formattedDate: formatDateBogota(options.scheduledAt),
+      formattedTime: formatTimeBogota(options.scheduledAt),
     };
   }
+
+  // #region agent log
+  debugOpenWaLog(
+    "openwa-inbound.ts:confirmAppointment",
+    "confirmation labels",
+    {
+      scheduledAtIso: options.scheduledAt.toISOString(),
+      formattedTime: appointment.formattedTime,
+      formattedDate: appointment.formattedDate,
+    },
+    "T1",
+  );
+  // #endregion
 
   await prisma.appointment.create({
     data: {
@@ -144,7 +150,7 @@ async function confirmAppointment(options: {
       donorName: options.donor.name,
       siteName: options.settings.siteName,
       siteAddress: options.settings.siteAddress,
-      sitePhone: options.settings.sitePhone,
+      sitePhone: sitePhoneForMessages(options.settings.sitePhone),
       formattedDate: appointment.formattedDate,
       formattedTime: appointment.formattedTime,
     });
@@ -214,7 +220,7 @@ async function handleAffirmativeReply(options: {
         phone: options.donor.phone,
         chatId: options.replyChatId,
         replyToMessageId: options.replyToMessageId,
-        message: `Hola ${options.donor.name}, no hay fechas disponibles en este momento. Por favor contacte a ${options.settings.sitePhone || options.settings.siteName}.`,
+        message: `Hola ${options.donor.name}, no hay fechas disponibles en este momento. Por favor contacte a ${sitePhoneForMessages(options.settings.sitePhone) || options.settings.siteName}.`,
       }).catch(() => {});
     }
     return { error: "Sin fechas disponibles", status: 503 };

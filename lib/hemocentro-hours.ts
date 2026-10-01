@@ -78,3 +78,28 @@ export function startOfBogotaDay(date: Date) {
   const { year, month, day } = bogotaDateParts(date);
   return new Date(Date.UTC(year, month - 1, day, 5, 0, 0));
 }
+
+export function formatDateBogota(date: Date): string {
+  return date.toLocaleDateString("es-CO", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: HEMOCENTRO_TZ,
+  });
+}
+
+export function formatTimeBogota(date: Date): string {
+  return date.toLocaleTimeString("es-CO", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: HEMOCENTRO_TZ,
+  });
+}
+
+/** Teléfono público en WhatsApp/correos (BD puede tener el número antiguo de la sede). */
+export function sitePhoneForMessages(stored: string | null | undefined): string {
+  const value = stored?.trim() ?? "";
+  const digits = value.replace(/\D/g, "");
+  if (!digits || digits.endsWith("5732706")) return HEMOCENTRO_SITE.phone;
+  return value || HEMOCENTRO_SITE.phone;
+}

@@ -191,6 +191,7 @@ describe("createDonorAppointment", () => {
 
     expect(result.googleEventId).toBe("google-event-001");
     expect(result.formattedDate).toBeTruthy();
+    expect(result.formattedTime).toMatch(/09:00\s*a\.?\s*m\.?/i);
     expect(mockEventsInsert).toHaveBeenCalledOnce();
 
     const insertCall = mockEventsInsert.mock.calls[0][0];

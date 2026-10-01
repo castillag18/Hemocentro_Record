@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 import type { Settings } from "@prisma/client";
-import { formatDate } from "./dates";
+import { formatDateBogota, formatTimeBogota, sitePhoneForMessages } from "./hemocentro-hours";
 import { debugOpenWaLog } from "./debug-openwa-log";
 import { nextAppointmentSlot } from "./reminders";
 import { getCalendarAuth, googleCalendarConfigured } from "./google-oauth";
@@ -140,6 +140,7 @@ export async function createDonorAppointment(options: {
   }
 
   const location = options.settings.siteAddress?.trim() || undefined;
+  const publicPhone = sitePhoneForMessages(options.settings.sitePhone);
   const event = await calendar.events.insert({
     calendarId: options.settings.googleCalendarId || "primary",
     sendUpdates: attendeeEmails.size > 0 ? "all" : "none",
@@ -151,7 +152,7 @@ export async function createDonorAppointment(options: {
         `Grupo sanguíneo: ${options.bloodType}`,
         `Agendado vía WhatsApp — ${options.settings.siteName}`,
         location ? `Sede: ${location}` : "",
-        options.settings.sitePhone ? `Teléfono sede: ${options.settings.sitePhone}` : "",
+        publicPhone ? `Teléfono sede: ${publicPhone}` : "",
       ]
         .filter(Boolean)
         .join("\n"),
@@ -173,11 +174,8 @@ export async function createDonorAppointment(options: {
   const result = {
     scheduledAt: start,
     googleEventId: event.data.id ?? null,
-    formattedDate: formatDate(start),
-    formattedTime: start.toLocaleTimeString("es-CO", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
+    formattedDate: formatDateBogota(start),
+    formattedTime: formatTimeBogota(start),
   };
   return result;
 }
@@ -197,7 +195,8 @@ export function buildAppointmentWhatsAppMessage(options: {
     `📅 *${options.formattedDate}* a las *${options.formattedTime}*`,
   ];
   if (options.siteAddress) lines.push(`📍 ${options.siteAddress}`);
-  if (options.sitePhone) lines.push(`📞 ${options.sitePhone}`);
+  const phone = sitePhoneForMessages(options.sitePhone);
+  if (phone) lines.push(`📞 ${phone}`);
   lines.push("", "Gracias por seguir salvando vidas. 🩸");
   return lines.join("\n");
 }
