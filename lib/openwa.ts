@@ -9,7 +9,9 @@ import {
   type OpenWaSessionSummary,
 } from "./openwa-session";
 
-function openWaFetch(input: RequestInfo | URL, init?: RequestInit) {
+type OpenWaFetchInit = RequestInit & { timeoutMs?: number };
+
+function openWaFetch(input: RequestInfo | URL, init?: OpenWaFetchInit) {
   const timeoutMs = init?.timeoutMs ?? getOpenWaFetchTimeoutMs();
   return openWaFetchQueued(input, { ...init, timeoutMs });
 }
