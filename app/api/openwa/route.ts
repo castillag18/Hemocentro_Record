@@ -19,6 +19,7 @@ import {
 } from "@/lib/openwa";
 import { openWaFetchQueued } from "@/lib/openwa-queue";
 import { pollOpenWaInbox } from "@/lib/openwa-inbox-poll";
+import { debugOpenWaLog } from "@/lib/debug-openwa-log";
 
 type OpenWaBody = {
   action?: string;
@@ -198,7 +199,10 @@ export async function POST(request: Request) {
 
     if (body.action === "qr") {
       const result = await ensureOpenWaQr(opts);
-      const webhook = await ensureWebhookRegistered(result.sessionUuid);
+      const linked = result.status.toLowerCase() === "ready" || result.alreadyLinked;
+      const webhook = linked
+        ? await ensureWebhookRegistered(result.sessionUuid)
+        : { webhookRegistered: false as const };
       if (result.alreadyLinked) {
         return NextResponse.json({
           qrSrc: null,
@@ -282,6 +286,17 @@ export async function POST(request: Request) {
     return jsonError("Acción inválida");
   } catch (err) {
     const raw = err instanceof Error ? err.message : "Error OpenWA";
-    return jsonError(friendlyOpenWaError(raw));
+    const friendly = friendlyOpenWaError(raw);
+    if (/limitó las peticiones|throttler/i.test(friendly)) {
+      // #region agent log
+      debugOpenWaLog(
+        "openwa/route.ts:POST",
+        "openwa throttle",
+        { action: body.action ?? "unknown" },
+        "R1",
+      );
+      // #endregion
+    }
+    return jsonError(friendly);
   }
 }

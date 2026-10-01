@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/client";
 import { Button } from "./Button";
 import { Icon } from "./Icon";
@@ -27,6 +27,14 @@ type OpenWaStatusResponse = {
   webhookWarning?: string;
   inboxPollingEnabled?: boolean;
 };
+
+const STATUS_POLL_MS = 180_000;
+const QR_POLL_MS = 45_000;
+const THROTTLE_COOLDOWN_MS = 120_000;
+
+function isOpenWaThrottleError(message: string) {
+  return /limitó las peticiones|throttler|too many requests/i.test(message);
+}
 
 export function OpenWaQrPanel({
   config,
@@ -56,6 +64,8 @@ export function OpenWaQrPanel({
   const [registeringWebhook, setRegisteringWebhook] = useState(false);
   const [pollingInbox, setPollingInbox] = useState(false);
   const [lastPollSummary, setLastPollSummary] = useState("");
+  const throttleUntilRef = useRef(0);
+  const qrAutoFetchDoneRef = useRef(false);
 
   const payload = useMemo(
     () => ({
@@ -65,8 +75,20 @@ export function OpenWaQrPanel({
       whatsappOpenWaSessionId: config.whatsappOpenWaSessionId,
       openwaWebhookSecret: config.openwaWebhookSecret,
     }),
-    [config],
+    [
+      config.whatsappMode,
+      config.whatsappOpenWaUrl,
+      config.whatsappOpenWaApiKey,
+      config.whatsappOpenWaSessionId,
+      config.openwaWebhookSecret,
+    ],
   );
+
+  const inThrottleCooldown = useCallback(() => Date.now() < throttleUntilRef.current, []);
+
+  const markThrottle = useCallback(() => {
+    throttleUntilRef.current = Date.now() + THROTTLE_COOLDOWN_MS;
+  }, []);
 
   const applySessionUuid = useCallback(
     (uuid?: string) => {
@@ -77,21 +99,18 @@ export function OpenWaQrPanel({
     [onSessionUuid],
   );
 
-  const refresh = useCallback(async () => {
-    if (!enabled || config.whatsappMode !== "openwa") return;
-    try {
-      const data = await api<OpenWaStatusResponse>("/api/openwa", {
-        method: "POST",
-        body: JSON.stringify({ action: "status", ...payload }),
-      });
-      setStatus(data.status);
-      setSentToday(data.sentToday);
-      setLimit(data.limit);
-      applySessionUuid(data.sessionUuid);
-      if (data.webhookUrl) setWebhookUrl(data.webhookUrl);
-      if (data.webhookRegistered != null) setWebhookRegistered(data.webhookRegistered);
-
-      if (data.status.toLowerCase() === "qr_ready" && !qrSrc) {
+  const fetchQr = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!enabled || config.whatsappMode !== "openwa") return;
+      if (inThrottleCooldown()) {
+        if (!options?.silent) {
+          setError(
+            "OpenWA limitó las peticiones. Espere 1–2 minutos antes de volver a generar el QR.",
+          );
+        }
+        return;
+      }
+      try {
         const qrData = await api<{
           qrSrc: string | null;
           status: string;
@@ -104,17 +123,46 @@ export function OpenWaQrPanel({
         });
         if (qrData.qrSrc) {
           setQrSrc(qrData.qrSrc);
-          setNotice("Escanee el código QR con WhatsApp → Dispositivos vinculados.");
+          if (!options?.silent) {
+            setNotice("Escanee el código QR con WhatsApp → Dispositivos vinculados.");
+          }
         } else if (qrData.alreadyLinked) {
+          setQrSrc("");
           setNotice(qrData.message ?? "WhatsApp ya está vinculado.");
         }
         applySessionUuid(qrData.sessionUuid);
         if (qrData.status) setStatus(qrData.status);
+        setError("");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "No se pudo obtener el QR";
+        if (isOpenWaThrottleError(msg)) markThrottle();
+        if (!options?.silent) setError(msg);
       }
+    },
+    [enabled, config.whatsappMode, payload, applySessionUuid, inThrottleCooldown, markThrottle],
+  );
+
+  const refreshStatus = useCallback(async () => {
+    if (!enabled || config.whatsappMode !== "openwa") return;
+    if (inThrottleCooldown()) return;
+    try {
+      const data = await api<OpenWaStatusResponse>("/api/openwa", {
+        method: "POST",
+        body: JSON.stringify({ action: "status", ...payload }),
+      });
+      setStatus(data.status);
+      setSentToday(data.sentToday);
+      setLimit(data.limit);
+      applySessionUuid(data.sessionUuid);
+      if (data.webhookUrl) setWebhookUrl(data.webhookUrl);
+      if (data.webhookRegistered != null) setWebhookRegistered(data.webhookRegistered);
+      setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "OpenWA no disponible");
+      const msg = err instanceof Error ? err.message : "OpenWA no disponible";
+      if (isOpenWaThrottleError(msg)) markThrottle();
+      setError(msg);
     }
-  }, [enabled, config.whatsappMode, payload, applySessionUuid, qrSrc]);
+  }, [enabled, config.whatsappMode, payload, applySessionUuid, inThrottleCooldown, markThrottle]);
 
   const checkWebhook = useCallback(async () => {
     if (!enabled || config.whatsappMode !== "openwa" || status.toLowerCase() !== "ready") return;
@@ -132,10 +180,17 @@ export function OpenWaQrPanel({
 
   useEffect(() => {
     if (!enabled || config.whatsappMode !== "openwa") return;
-    void refresh();
-    const timer = setInterval(() => void refresh(), 120_000);
+    void refreshStatus();
+    const timer = setInterval(() => void refreshStatus(), STATUS_POLL_MS);
     return () => clearInterval(timer);
-  }, [enabled, config.whatsappMode, refresh]);
+  }, [enabled, config.whatsappMode, refreshStatus]);
+
+  useEffect(() => {
+    if (!enabled || config.whatsappMode !== "openwa") return;
+    if (status.toLowerCase() !== "qr_ready" || qrSrc || qrAutoFetchDoneRef.current) return;
+    qrAutoFetchDoneRef.current = true;
+    void fetchQr({ silent: true });
+  }, [enabled, config.whatsappMode, status, qrSrc, fetchQr]);
 
   useEffect(() => {
     if (!enabled || status.toLowerCase() !== "ready") return;
@@ -177,20 +232,12 @@ export function OpenWaQrPanel({
 
   useEffect(() => {
     if (status.toLowerCase() !== "qr_ready" || !enabled) return;
-    const timer = setInterval(async () => {
-      try {
-        const data = await api<{ qrSrc: string | null; status: string }>("/api/openwa", {
-          method: "POST",
-          body: JSON.stringify({ action: "qr", ...payload }),
-        });
-        if (data.qrSrc) setQrSrc(data.qrSrc);
-        if (data.status) setStatus(data.status);
-      } catch {
-        /* QR puede estar renovándose */
-      }
-    }, 20000);
+    const timer = setInterval(() => {
+      if (inThrottleCooldown()) return;
+      void fetchQr({ silent: true });
+    }, QR_POLL_MS);
     return () => clearInterval(timer);
-  }, [status, enabled, payload]);
+  }, [status, enabled, fetchQr, inThrottleCooldown]);
 
   async function runWithSave(action: () => Promise<void>) {
     setError("");
@@ -200,34 +247,22 @@ export function OpenWaQrPanel({
   }
 
   async function generateQr() {
+    if (inThrottleCooldown()) {
+      setError("OpenWA limitó las peticiones. Espere 1–2 minutos y vuelva a intentar.");
+      return;
+    }
     setLoading(true);
     setError("");
     setNotice("");
     try {
       await runWithSave(async () => {
-        const data = await api<{
-          qrSrc: string | null;
-          status: string;
-          sessionUuid?: string;
-          alreadyLinked?: boolean;
-          message?: string;
-        }>("/api/openwa", {
-          method: "POST",
-          body: JSON.stringify({ action: "qr", ...payload }),
-        });
-        if (data.qrSrc) {
-          setQrSrc(data.qrSrc);
-          setNotice("Código QR generado. Escanéelo con WhatsApp → Dispositivos vinculados.");
-        } else if (data.alreadyLinked) {
-          setQrSrc("");
-          setNotice(data.message ?? "WhatsApp ya está vinculado en esta sesión.");
-        }
-        setStatus(data.status);
-        applySessionUuid(data.sessionUuid);
+        qrAutoFetchDoneRef.current = true;
+        await fetchQr();
       });
-      void refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo generar el QR");
+      const msg = err instanceof Error ? err.message : "No se pudo generar el QR";
+      if (isOpenWaThrottleError(msg)) markThrottle();
+      setError(msg);
     } finally {
       setLoading(false);
     }
