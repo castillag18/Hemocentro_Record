@@ -142,11 +142,19 @@ export default function CitasPage() {
     setNotice("");
     showLoading("Sincronizando citas con Google Calendar...");
     try {
-      const result = await api<{ synced: number; failed: number }>("/api/google-calendar/sync", {
+      const result = await api<{
+        synced: number;
+        failed: number;
+        failures?: { appointmentId: string; error: string }[];
+      }>("/api/google-calendar/sync", {
         method: "POST",
       });
       closeLoading();
-      setNotice(`Sincronizadas: ${result.synced}. Fallidas: ${result.failed}.`);
+      const detail =
+        result.failed > 0 && result.failures?.length
+          ? ` Detalle: ${result.failures.map((f) => f.error).join(" | ")}`
+          : "";
+      setNotice(`Sincronizadas: ${result.synced}. Fallidas: ${result.failed}.${detail}`);
       await load();
       if (result.synced > 0) {
         void alertSuccess("Calendar", `${result.synced} cita(s) enviada(s) a Google Calendar`);

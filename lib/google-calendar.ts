@@ -1,14 +1,37 @@
 import { google } from "googleapis";
 import type { Settings } from "@prisma/client";
 import { formatDate } from "./dates";
+import { debugOpenWaLog } from "./debug-openwa-log";
 import { nextAppointmentSlot } from "./reminders";
 import { getCalendarAuth, googleCalendarConfigured } from "./google-oauth";
 import { prisma } from "./prisma";
+import { assertSafeEmail } from "./validation/sanitize";
 
 export { googleCalendarConfigured };
 
+export type CalendarSyncFailure = { appointmentId: string; error: string };
+
+function calendarAttendeeEmail(raw: string | null | undefined): string | null {
+  if (!raw?.trim()) return null;
+  try {
+    return assertSafeEmail(raw);
+  } catch {
+    return null;
+  }
+}
+
+function calendarApiErrorMessage(err: unknown): string {
+  const gaxios = err as { response?: { data?: { error?: { message?: string; errors?: { message?: string }[] } } } };
+  const fromApi =
+    gaxios.response?.data?.error?.message ??
+    gaxios.response?.data?.error?.errors?.[0]?.message;
+  if (fromApi) return String(fromApi).slice(0, 240);
+  if (err instanceof Error) return err.message.slice(0, 240);
+  return "Error desconocido al crear evento";
+}
+
 export async function syncPendingAppointmentsToCalendar(settings: Settings) {
-  if (!googleCalendarConfigured(settings)) return { synced: 0, failed: 0 };
+  if (!googleCalendarConfigured(settings)) return { synced: 0, failed: 0, failures: [] as CalendarSyncFailure[] };
 
   const pending = await prisma.appointment.findMany({
     where: {
@@ -25,6 +48,7 @@ export async function syncPendingAppointmentsToCalendar(settings: Settings) {
 
   let synced = 0;
   let failed = 0;
+  const failures: CalendarSyncFailure[] = [];
   for (const item of pending) {
     try {
       const created = await createDonorAppointment({
@@ -40,13 +64,32 @@ export async function syncPendingAppointmentsToCalendar(settings: Settings) {
           data: { googleEventId: created.googleEventId },
         });
         synced += 1;
+      } else {
+        failed += 1;
+        failures.push({ appointmentId: item.id, error: "Google Calendar no devolvió id de evento" });
       }
-    } catch {
+    } catch (err) {
       failed += 1;
+      const error = calendarApiErrorMessage(err);
+      failures.push({ appointmentId: item.id, error });
+      // #region agent log
+      debugOpenWaLog(
+        "google-calendar.ts:sync",
+        "appointment sync failed",
+        {
+          appointmentId: item.id,
+          error,
+          donorEmailPresent: Boolean(item.donor.email?.trim()),
+          donorEmailValid: Boolean(calendarAttendeeEmail(item.donor.email)),
+          scheduledAtIso: item.scheduledAt.toISOString(),
+        },
+        "G1",
+      );
+      // #endregion
     }
   }
 
-  return { synced, failed };
+  return { synced, failed, failures };
 }
 
 async function getStaffAttendeeEmails() {
@@ -54,7 +97,10 @@ async function getStaffAttendeeEmails() {
     where: { active: true },
     select: { email: true },
   });
-  return [...new Set(staff.map((user) => user.email.toLowerCase()).filter(Boolean))];
+  const emails = staff
+    .map((user) => calendarAttendeeEmail(user.email))
+    .filter((email): email is string => Boolean(email));
+  return [...new Set(emails)];
 }
 
 export async function createDonorAppointment(options: {
@@ -87,9 +133,8 @@ export async function createDonorAppointment(options: {
   const calendar = google.calendar({ version: "v3", auth });
   const staffEmails = await getStaffAttendeeEmails();
   const attendeeEmails = new Set<string>();
-  if (options.donorEmail) {
-    attendeeEmails.add(options.donorEmail.toLowerCase());
-  }
+  const donorAttendee = calendarAttendeeEmail(options.donorEmail);
+  if (donorAttendee) attendeeEmails.add(donorAttendee);
   for (const email of staffEmails) {
     attendeeEmails.add(email);
   }

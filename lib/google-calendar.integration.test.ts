@@ -270,7 +270,7 @@ describe("syncPendingAppointmentsToCalendar", () => {
 
     const result = await syncPendingAppointmentsToCalendar(baseSettings());
 
-    expect(result).toEqual({ synced: 1, failed: 0 });
+    expect(result).toEqual({ synced: 1, failed: 0, failures: [] });
     expect(mockPrisma.appointment.update).toHaveBeenCalledWith({
       where: { id: "appt-1" },
       data: { googleEventId: "sync-event-99" },
@@ -281,8 +281,31 @@ describe("syncPendingAppointmentsToCalendar", () => {
     const result = await syncPendingAppointmentsToCalendar(
       baseSettings({ googleRefreshToken: null, googleCredentialsJson: null }),
     );
-    expect(result).toEqual({ synced: 0, failed: 0 });
+    expect(result).toEqual({ synced: 0, failed: 0, failures: [] });
     expect(mockPrisma.appointment.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("createDonorAppointment — correo donante inválido", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockEventsInsert.mockResolvedValue({ data: { id: "google-event-invalid-email" } });
+    mockPrisma.adminUser.findMany.mockResolvedValue([]);
+    mockPrisma.settings.update.mockResolvedValue({});
+  });
+
+  it("crea el evento sin invitar al donante si el correo no es válido", async () => {
+    await createDonorAppointment({
+      settings: baseSettings(),
+      donorName: "PRUEBA PRUEBA",
+      donorEmail: "0",
+      bloodType: "AB-",
+      scheduledAt: new Date("2026-10-02T14:00:00.000Z"),
+    });
+
+    const insertCall = mockEventsInsert.mock.calls[0][0];
+    expect(insertCall.sendUpdates).toBe("none");
+    expect(insertCall.requestBody.attendees).toBeUndefined();
   });
 });
 
