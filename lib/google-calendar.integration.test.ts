@@ -65,7 +65,7 @@ function baseSettings(overrides: Partial<Settings> = {}): Settings {
     appointmentLink: "",
     siteName: "HUAV Banco de Sangre",
     siteAddress: "Carrera 13 # 13c-39, Valledupar",
-    sitePhone: "(605) 5732706",
+    sitePhone: "3182616448",
     whatsappMode: "openwa",
     whatsappAccessToken: "",
     whatsappPhoneNumberId: "",
@@ -315,14 +315,14 @@ describe("mensajes de confirmación de cita", () => {
       donorName: "Ana",
       siteName: "HUAV Banco de Sangre",
       siteAddress: "Carrera 13 # 13c-39",
-      sitePhone: "(605) 5732706",
+      sitePhone: "3182616448",
       formattedDate: "15/10/2026",
       formattedTime: "09:00 a. m.",
     });
     expect(msg).toContain("Ana");
     expect(msg).toContain("15/10/2026");
     expect(msg).toContain("Carrera 13");
-    expect(msg).toContain("(605) 5732706");
+    expect(msg).toContain("3182616448");
   });
 
   it("buildAppointmentConfirmationEmail incluye datos de la cita", () => {

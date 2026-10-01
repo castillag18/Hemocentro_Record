@@ -2,7 +2,7 @@
 export const HEMOCENTRO_SITE = {
   name: "HEMOCENTRO Y UNIDAD DE AFÉRESIS",
   address: "Carrera 13 # 13c-39, Valledupar, Cesar",
-  phone: "(605) 5732706",
+  phone: "3182616448",
 } as const;
 
 export const HEMOCENTRO_TZ = "America/Bogota";

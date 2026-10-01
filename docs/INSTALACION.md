@@ -406,7 +406,7 @@ Las citas confirmadas por WhatsApp aparecen en **Citas** del menú lateral, aunq
 | Sábado | 8 a.m.–12:30 p.m. | 8:00, 9:00, 10:00, 11:00 |
 | Domingo | Cerrado | — |
 
-**Sede:** Carrera 13 # 13c-39, Valledupar, Cesar · **Tel:** (605) 5732706
+**Sede:** Carrera 13 # 13c-39, Valledupar, Cesar · **Tel:** 3182616448
 
 ### 6.7 Motor Baileys (recomendado si los envíos fallan)
 
