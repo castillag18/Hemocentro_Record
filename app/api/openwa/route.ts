@@ -98,6 +98,12 @@ function friendlyOpenWaError(message: string) {
   if (/throttler|too many requests/i.test(message)) {
     return "OpenWA limitó las peticiones (Throttler). Espere 1–2 minutos. La sesión puede seguir «ready» en el panel de OpenWA; evite abrir Configuración con muchas pestañas a la vez.";
   }
+  if (/session is not started/i.test(message)) {
+    return "La sesión no estaba en ejecución. Pulse «Generar código QR» de nuevo (la app iniciará la sesión automáticamente).";
+  }
+  if (/internal server error|error 500/i.test(message)) {
+    return "OpenWA falló al iniciar (error interno). En la VM: docker restart openwa-api, espere 30 s y vuelva a «Generar código QR».";
+  }
   return message;
 }
 

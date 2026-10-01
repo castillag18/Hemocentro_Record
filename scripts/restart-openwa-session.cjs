@@ -1,11 +1,21 @@
 /**
- * Reinicia la sesión OpenWA (force-kill + start).
- * Si el estado es «failed», escanee el QR de nuevo después.
+ * Reinicia la sesión OpenWA (force-kill solo si está activa + start).
+ * Si el estado es «failed», no hace force-kill (OpenWA responde «not started»).
  */
 require("./load-env.cjs").loadEnv();
 
 const { PrismaClient } = require("@prisma/client");
 const { resolveSessionUuid, fetchOpenWa } = require("./openwa-http.cjs");
+
+const ACTIVE = new Set([
+  "ready",
+  "initializing",
+  "authenticating",
+  "qr_ready",
+  "connecting",
+  "connected",
+  "open",
+]);
 
 async function main() {
   const p = new PrismaClient();
@@ -33,30 +43,52 @@ async function main() {
 
     console.log("Sesión UUID:", sessionUuid);
 
-    const kill = await fetchOpenWa(
-      `${base}/api/sessions/${encodeURIComponent(sessionUuid)}/force-kill`,
-      key,
-      30_000,
-      { method: "POST" },
-    );
-    console.log("force-kill:", kill.status, JSON.stringify(kill.data).slice(0, 200));
-    if (!kill.ok && kill.status !== 404) {
-      console.warn("force-kill no OK — continúa con start si la sesión quedó colgada");
+    const probe = await fetchOpenWa(`${base}/api/sessions/${encodeURIComponent(sessionUuid)}`, key);
+    const state = String(probe.data?.status ?? probe.data?.state ?? "unknown").toLowerCase();
+    console.log("Estado antes:", state);
+
+    if (ACTIVE.has(state)) {
+      const kill = await fetchOpenWa(
+        `${base}/api/sessions/${encodeURIComponent(sessionUuid)}/force-kill`,
+        key,
+        30_000,
+        { method: "POST" },
+      );
+      console.log("force-kill:", kill.status, JSON.stringify(kill.data).slice(0, 200));
+      await new Promise((r) => setTimeout(r, 4000));
+    } else {
+      console.log("Omitiendo force-kill (sesión no activa — típico en «failed»).");
     }
 
-    await new Promise((r) => setTimeout(r, 5000));
+    let startOk = false;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const start = await fetchOpenWa(
+        `${base}/api/sessions/${encodeURIComponent(sessionUuid)}/start`,
+        key,
+        90_000,
+        { method: "POST" },
+      );
+      console.log(`start (intento ${attempt}):`, start.status, JSON.stringify(start.data).slice(0, 200));
+      if (start.ok || start.status === 409) {
+        startOk = true;
+        break;
+      }
+      if (attempt < 2) {
+        console.warn("Esperando 8 s antes de reintentar start…");
+        await new Promise((r) => setTimeout(r, 8000));
+      }
+    }
 
-    const start = await fetchOpenWa(
-      `${base}/api/sessions/${encodeURIComponent(sessionUuid)}/start`,
-      key,
-      60_000,
-      { method: "POST" },
-    );
-    console.log("start:", start.status, JSON.stringify(start.data).slice(0, 200));
+    if (!startOk) {
+      console.error("\n❌ OpenWA no pudo iniciar la sesión (error 500 u otro).");
+      console.error("→ docker restart openwa-api");
+      console.error("→ Espere 30 s → Configuración → Generar código QR");
+      process.exit(1);
+    }
 
     const status = await fetchOpenWa(`${base}/api/sessions/${encodeURIComponent(sessionUuid)}`, key);
-    const state = status.data?.status ?? status.data?.state ?? "?";
-    console.log("Estado actual:", state);
+    const after = status.data?.status ?? status.data?.state ?? "?";
+    console.log("Estado actual:", after);
 
     console.log("\n→ Configuración → Canales → Generar QR y escanear con WhatsApp");
     console.log("→ Luego: npm run openwa:check");

@@ -35,6 +35,72 @@ function isStartNoOp(res: Response, data: { message?: string; error?: string }) 
 
 const QR_PENDING_STATUSES = new Set(["qr_ready", "initializing", "connecting", "authenticated"]);
 const LINKED_STATUSES = new Set(["ready"]);
+/** Sesión con motor Chromium activo (force-kill aplica). «failed» suele estar detenida. */
+const OPENWA_ACTIVE_STATUSES = new Set([
+  "ready",
+  "initializing",
+  "authenticating",
+  "qr_ready",
+  "connecting",
+  "connected",
+  "open",
+]);
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function tryForceKillSession(
+  options: { baseUrl: string; apiKey: string },
+  sessionUuid: string,
+) {
+  const base = options.baseUrl.replace(/\/$/, "");
+  const res = await openWaFetch(`${base}/api/sessions/${encodeURIComponent(sessionUuid)}/force-kill`, {
+    method: "POST",
+    headers: openWaHeaders(options.apiKey),
+  });
+  if (res.ok) return;
+  const data = (await res.json().catch(() => ({}))) as { message?: string; error?: string };
+  const msg = `${data.message ?? ""} ${data.error ?? ""}`;
+  if (/not started|not running/i.test(msg)) return;
+  if (res.status === 400 && /not started/i.test(msg)) return;
+}
+
+/** Reinicia sesión detenida o fallida y deja lista para QR (sin bloquear la UI). */
+export async function prepareOpenWaSessionForQr(options: {
+  baseUrl: string;
+  apiKey: string;
+  sessionId: string;
+}) {
+  const current = await getOpenWaSessionStatus(options);
+  const state = current.status.toLowerCase();
+  if (LINKED_STATUSES.has(state)) return current;
+
+  if (OPENWA_ACTIVE_STATUSES.has(state)) {
+    await tryForceKillSession(options, current.sessionUuid);
+    await sleep(4000);
+  }
+
+  let lastError = "No se pudo iniciar la sesión";
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      await startOpenWaSession(options);
+      return getOpenWaSessionStatus(options);
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
+      if (/already started|already starting/i.test(lastError)) {
+        return getOpenWaSessionStatus(options);
+      }
+      if (attempt < 2) await sleep(6000);
+    }
+  }
+
+  throw new Error(
+    `${lastError}. Si OpenWA devolvió error 500: docker restart openwa-api, espere 30 s y pulse «Generar código QR» de nuevo.`,
+  );
+}
 
 export async function startOpenWaSession(options: {
   baseUrl: string;
@@ -75,13 +141,9 @@ export async function ensureOpenWaQr(options: {
     };
   }
 
-  if (state === "failed") {
-    throw new Error(
-      "Sesión en «failed». En la VM ejecute una vez: npm run openwa:restart-session, luego «Generar código QR». No repita docker restart en bucle.",
-    );
-  }
-
-  if (!QR_PENDING_STATUSES.has(state)) {
+  if (state === "failed" || state === "disconnected" || state === "stopped") {
+    await prepareOpenWaSessionForQr(options);
+  } else if (!QR_PENDING_STATUSES.has(state)) {
     try {
       await startOpenWaSession(options);
     } catch (err) {
