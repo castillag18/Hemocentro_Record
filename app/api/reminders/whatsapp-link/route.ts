@@ -39,6 +39,7 @@ export async function GET(request: Request) {
       name: donor.name,
       lastDonationDate: donor.lastDonationDate,
       bloodType: donor.bloodType,
+      donationType: donor.donationType,
       nextDonationDate,
       appointmentLink: settings.appointmentLink,
     }),

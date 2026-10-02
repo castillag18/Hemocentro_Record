@@ -27,6 +27,7 @@ export async function GET(request: Request) {
             phone: true,
             email: true,
             bloodType: true,
+            donationType: true,
           },
         },
       },

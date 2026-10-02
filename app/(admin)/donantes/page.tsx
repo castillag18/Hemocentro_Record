@@ -6,6 +6,7 @@ import { api, initials } from "@/lib/client";
 import { formatDate } from "@/lib/dates";
 import { BLOOD_TYPES } from "@/lib/constants";
 import { BloodTypeBadge } from "@/components/BloodTypeBadge";
+import { DonationTypeBadge } from "@/components/DonationTypeBadge";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import { DonorFormModal, type DonorRecord } from "@/components/DonorFormModal";
@@ -182,6 +183,7 @@ function DonantesContent() {
                 <th className="py-sm px-md text-title-md">Nombre</th>
                 <th className="py-sm px-md text-title-md">Cédula</th>
                 <th className="py-sm px-md text-title-md">Grupo</th>
+                <th className="py-sm px-md text-title-md">Donación</th>
                 <th className="py-sm px-md text-title-md">Última donación</th>
                 <th className="py-sm px-md text-title-md">Contacto</th>
                 <th className="py-sm px-md text-title-md text-right">Acciones</th>
@@ -201,6 +203,9 @@ function DonantesContent() {
                   <td className="py-sm px-md font-mono text-mono-md text-secondary">{donor.documentId}</td>
                   <td className="py-sm px-md">
                     <BloodTypeBadge type={donor.bloodType} />
+                  </td>
+                  <td className="py-sm px-md">
+                    <DonationTypeBadge type={donor.donationType} />
                   </td>
                   <td className="py-sm px-md text-secondary">{formatDate(donor.lastDonationDate)}</td>
                   <td className="py-sm px-md">
@@ -226,7 +231,7 @@ function DonantesContent() {
               ))}
               {!data?.donors.length ? (
                 <tr>
-                  <td colSpan={6} className="py-lg text-center text-secondary">
+                  <td colSpan={7} className="py-lg text-center text-secondary">
                     No hay donantes. Importe un archivo o registre uno nuevo.
                   </td>
                 </tr>

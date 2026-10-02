@@ -76,7 +76,14 @@ async function notifyDonorWhatsApp(
 
 async function confirmAppointment(options: {
   settings: Settings;
-  donor: { id: string; name: string; email: string | null; phone: string | null; bloodType: string };
+  donor: {
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    bloodType: string;
+    donationType: string;
+  };
   scheduledAt: Date;
   bookingSessionId?: string;
   replyChatId?: string;
@@ -97,6 +104,7 @@ async function confirmAppointment(options: {
         donorName: options.donor.name,
         donorEmail: options.donor.email,
         bloodType: options.donor.bloodType,
+        donationType: options.donor.donationType,
         scheduledAt: options.scheduledAt,
       });
     } catch {
@@ -139,6 +147,7 @@ async function confirmAppointment(options: {
       sitePhone: sitePhoneForMessages(options.settings.sitePhone),
       formattedDate: appointment.formattedDate,
       formattedTime: appointment.formattedTime,
+      donationType: options.donor.donationType,
     });
     try {
       await notifyDonorWhatsApp(options.settings, {
@@ -164,6 +173,7 @@ async function confirmAppointment(options: {
         siteAddress: options.settings.siteAddress,
         formattedDate: appointment.formattedDate,
         formattedTime: appointment.formattedTime,
+        donationType: options.donor.donationType,
       }),
     });
   }

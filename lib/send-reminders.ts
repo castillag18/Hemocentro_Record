@@ -74,6 +74,7 @@ export async function sendRemindersToDonors(options: {
         name: donor.name,
         lastDonationDate: donor.lastDonationDate,
         bloodType: donor.bloodType,
+        donationType: donor.donationType,
         nextDonationDate: donor.nextDonationDate,
         appointmentLink: settings.appointmentLink,
       }),

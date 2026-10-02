@@ -1,4 +1,4 @@
-import type { DonationType, Gender } from "./constants";
+import { DONATION_TYPE_LABELS, type DonationType, type Gender } from "./constants";
 import { addDays, addMonths, startOfDay } from "./dates";
 
 export type ReminderIntervalSettings = {
@@ -44,6 +44,10 @@ export function normalizeDonationType(value: unknown): DonationType {
     return "aferesis";
   }
   return "total";
+}
+
+export function donationTypeLabel(value: unknown): string {
+  return DONATION_TYPE_LABELS[normalizeDonationType(value)];
 }
 
 export function getApheresisReminderMonths(settings: ReminderIntervalSettings): number {

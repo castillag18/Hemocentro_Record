@@ -47,6 +47,7 @@ export const TEMPLATE_VARIABLES = [
   "{last_donation_date}",
   "{next_donation_date}",
   "{blood_type}",
+  "{donation_type}",
   "{appointment_link}",
   "{special_date_name}",
 ] as const;
@@ -65,7 +66,7 @@ export const DEFAULT_SPECIAL_DATES: SpecialDateEntry[] = [
 
 export const DEFAULT_WHATSAPP_BODY = `Hola, *{donor_name}* 👋.
 
-En *HUAV Banco de Sangre* recordamos con gratitud tu última donación el día {last_donation_date}. Queremos contarte que ya puedes volver a donar a partir del {next_donation_date} y tu cuerpo está listo para salvar vidas. ❤️
+En *HUAV Banco de Sangre* recordamos con gratitud tu última donación el día {last_donation_date} (*{donation_type}*). Queremos contarte que ya puedes volver a donar a partir del {next_donation_date} y tu cuerpo está listo para salvar vidas. ❤️
 
 ¿Te gustaría agendar una cita para esta semana?
 Responde *Sí* a este mensaje y le enviaremos las fechas disponibles para que elija la que prefiera.

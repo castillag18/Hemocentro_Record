@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import type { Settings } from "@prisma/client";
+import { donationTypeLabel } from "./donation-intervals";
 import { formatDateBogota, formatTimeBogota, sitePhoneForMessages } from "./hemocentro-hours";
 import { nextAppointmentSlot } from "./reminders";
 import { getCalendarAuth, googleCalendarConfigured } from "./google-oauth";
@@ -39,7 +40,7 @@ export async function syncPendingAppointmentsToCalendar(settings: Settings) {
       scheduledAt: { gte: new Date() },
     },
     include: {
-      donor: { select: { name: true, email: true, bloodType: true } },
+      donor: { select: { name: true, email: true, bloodType: true, donationType: true } },
     },
     orderBy: { scheduledAt: "asc" },
     take: 50,
@@ -55,6 +56,7 @@ export async function syncPendingAppointmentsToCalendar(settings: Settings) {
         donorName: item.donor.name,
         donorEmail: item.donor.email,
         bloodType: item.donor.bloodType,
+        donationType: item.donor.donationType,
         scheduledAt: item.scheduledAt,
       });
       if (created.googleEventId) {
@@ -93,8 +95,10 @@ export async function createDonorAppointment(options: {
   donorName: string;
   donorEmail?: string | null;
   bloodType: string;
+  donationType?: string | null;
   scheduledAt?: Date;
 }) {
+  const donationLabel = donationTypeLabel(options.donationType);
   const calendarReady = googleCalendarConfigured(options.settings);
   if (!calendarReady) {
     throw new Error("Google Calendar no está configurado");
@@ -130,10 +134,11 @@ export async function createDonorAppointment(options: {
     calendarId: options.settings.googleCalendarId || "primary",
     sendUpdates: attendeeEmails.size > 0 ? "all" : "none",
     requestBody: {
-      summary: `Donación de sangre — ${options.donorName}`,
+      summary: `Donación (${donationLabel}) — ${options.donorName}`,
       location,
       description: [
         `Donante: ${options.donorName}`,
+        `Tipo de donación: ${donationLabel}`,
         `Grupo sanguíneo: ${options.bloodType}`,
         `Agendado vía WhatsApp — ${options.settings.siteName}`,
         location ? `Sede: ${location}` : "",
@@ -172,11 +177,13 @@ export function buildAppointmentWhatsAppMessage(options: {
   sitePhone: string;
   formattedDate: string;
   formattedTime: string;
+  donationType?: string | null;
 }) {
+  const donationLabel = donationTypeLabel(options.donationType);
   const lines = [
     `¡Hola ${options.donorName}! ✅`,
     "",
-    `Su cita de donación en *${options.siteName}* quedó confirmada:`,
+    `Su cita de *${donationLabel}* en *${options.siteName}* quedó confirmada:`,
     `📅 *${options.formattedDate}* a las *${options.formattedTime}*`,
   ];
   if (options.siteAddress) lines.push(`📍 ${options.siteAddress}`);
@@ -192,12 +199,15 @@ export function buildAppointmentConfirmationEmail(options: {
   siteAddress: string;
   formattedDate: string;
   formattedTime: string;
+  donationType?: string | null;
 }) {
+  const donationLabel = donationTypeLabel(options.donationType);
   return `<div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;color:#111c2d;">
     <h2 style="color:#9e001f;">Cita confirmada — ${options.siteName}</h2>
     <p>Hola <strong>${options.donorName}</strong>,</p>
-    <p>Su cita de donación de sangre ha sido agendada exitosamente:</p>
+    <p>Su cita de <strong>${donationLabel}</strong> ha sido agendada exitosamente:</p>
     <ul>
+      <li><strong>Tipo de donación:</strong> ${donationLabel}</li>
       <li><strong>Fecha:</strong> ${options.formattedDate}</li>
       <li><strong>Hora:</strong> ${options.formattedTime}</li>
       ${options.siteAddress ? `<li><strong>Sede:</strong> ${options.siteAddress}</li>` : ""}

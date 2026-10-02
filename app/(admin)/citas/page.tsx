@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/client";
 import { formatDate } from "@/lib/dates";
 import { BloodTypeBadge } from "@/components/BloodTypeBadge";
+import { DonationTypeBadge } from "@/components/DonationTypeBadge";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import { Pagination } from "@/components/Pagination";
@@ -22,6 +23,7 @@ type AppointmentRow = {
     phone: string | null;
     email: string | null;
     bloodType: string;
+    donationType: string;
   };
 };
 
@@ -239,13 +241,14 @@ export default function CitasPage() {
                     <th className="px-4 py-3">Fecha</th>
                     <th className="px-4 py-3">Hora</th>
                     <th className="px-4 py-3">Grupo</th>
+                    <th className="px-4 py-3">Donación</th>
                     <th className="px-4 py-3">Calendar</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.appointments.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-secondary">
+                      <td colSpan={6} className="px-4 py-8 text-center text-secondary">
                         No hay citas próximas confirmadas.
                       </td>
                     </tr>
@@ -262,6 +265,9 @@ export default function CitasPage() {
                         <td className="px-4 py-3">{formatTime(item.scheduledAt)}</td>
                         <td className="px-4 py-3">
                           <BloodTypeBadge type={item.donor.bloodType} />
+                        </td>
+                        <td className="px-4 py-3">
+                          <DonationTypeBadge type={item.donor.donationType} />
                         </td>
                         <td className="px-4 py-3">
                           {item.googleEventId ? (

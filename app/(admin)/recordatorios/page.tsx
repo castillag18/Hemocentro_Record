@@ -5,6 +5,7 @@ import { api, initials } from "@/lib/client";
 import { formatDate } from "@/lib/dates";
 import { BLOOD_TYPES } from "@/lib/constants";
 import { BloodTypeBadge } from "@/components/BloodTypeBadge";
+import { DonationTypeBadge } from "@/components/DonationTypeBadge";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import { WhatsAppQueueModal, type WhatsAppQueueItem } from "@/components/WhatsAppQueueModal";
@@ -19,6 +20,7 @@ type Eligible = {
   email: string | null;
   phone: string | null;
   bloodType: string;
+  donationType: string;
   lastDonationDate: string;
   nextDonationDate: string;
   reminderStatus: "pendiente" | "enviado" | "fallido";
@@ -231,6 +233,7 @@ export default function RecordatoriosPage() {
                 </th>
                 <th className="p-sm text-label-md uppercase">Donante</th>
                 <th className="p-sm text-label-md uppercase">Grupo</th>
+                <th className="p-sm text-label-md uppercase">Donación</th>
                 <th className="p-sm text-label-md uppercase">Última donación</th>
                 <th className="p-sm text-label-md uppercase">Elegible desde</th>
                 <th className="p-sm text-label-md uppercase">Estado</th>
@@ -261,6 +264,9 @@ export default function RecordatoriosPage() {
                   </td>
                   <td className="p-sm">
                     <BloodTypeBadge type={donor.bloodType} />
+                  </td>
+                  <td className="p-sm">
+                    <DonationTypeBadge type={donor.donationType} />
                   </td>
                   <td className="p-sm text-secondary">{formatDate(donor.lastDonationDate)}</td>
                   <td className="p-sm font-medium">{formatDate(donor.nextDonationDate)}</td>
@@ -301,7 +307,7 @@ export default function RecordatoriosPage() {
               ))}
               {!data?.donors.length ? (
                 <tr>
-                  <td colSpan={7} className="py-lg text-center text-secondary">
+                  <td colSpan={8} className="py-lg text-center text-secondary">
                     No hay donantes en este filtro.
                   </td>
                 </tr>

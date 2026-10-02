@@ -197,7 +197,7 @@ describe("createDonorAppointment", () => {
     const insertCall = mockEventsInsert.mock.calls[0][0];
     expect(insertCall.calendarId).toBe("primary");
     expect(insertCall.sendUpdates).toBe("all");
-    expect(insertCall.requestBody.summary).toBe("Donación de sangre — María López");
+    expect(insertCall.requestBody.summary).toBe("Donación (Sangre total) — María López");
     expect(insertCall.requestBody.location).toBe(settings.siteAddress);
     expect(insertCall.requestBody.start.timeZone).toBe("America/Bogota");
     expect(insertCall.requestBody.end.timeZone).toBe("America/Bogota");
@@ -207,6 +207,7 @@ describe("createDonorAppointment", () => {
         { email: "staff@hemocentro.local" },
       ]),
     );
+    expect(insertCall.requestBody.description).toContain("Tipo de donación: Sangre total");
     expect(insertCall.requestBody.description).toContain("Grupo sanguíneo: O+");
   });
 
@@ -319,8 +320,10 @@ describe("mensajes de confirmación de cita", () => {
       sitePhone: "3182616448",
       formattedDate: "15/10/2026",
       formattedTime: "09:00 a. m.",
+      donationType: "aferesis",
     });
     expect(msg).toContain("Ana");
+    expect(msg).toContain("Aféresis");
     expect(msg).toContain("15/10/2026");
     expect(msg).toContain("Carrera 13");
     expect(msg).toContain("3182616448");
@@ -333,8 +336,10 @@ describe("mensajes de confirmación de cita", () => {
       siteAddress: "Valledupar",
       formattedDate: "20/10/2026",
       formattedTime: "10:30 a. m.",
+      donationType: "total",
     });
     expect(html).toContain("Carlos");
+    expect(html).toContain("Sangre total");
     expect(html).toContain("20/10/2026");
     expect(html).toContain("Valledupar");
   });
