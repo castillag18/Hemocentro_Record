@@ -9,7 +9,7 @@ const { spawnSync, execSync } = require("child_process");
 const root = process.cwd();
 const logsDir = path.join(root, "logs");
 const logFile = path.join(logsDir, "reminders-cron.log");
-const cronScript = path.join(root, "scripts", "run-cron.cjs");
+const cronScript = path.join(root, "scripts", "run-cron.cjs"); // delega en run-cron-direct.ts (tsx)
 const nodeBin = path.dirname(process.execPath);
 const force = process.argv.includes("--force");
 

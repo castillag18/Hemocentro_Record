@@ -563,10 +563,12 @@ Log: `logs/reminders-cron.log`
 
 ```bash
 npm run cron:reminders          # solo envía si ahora es la hora configurada en Colombia
-npm run cron:reminders:force    # prueba de envío (ignora la hora)
+npm run cron:reminders:force    # prueba de envío (ignora la hora; puede tardar varios minutos)
 ```
 
-En la respuesta JSON busque `donation.sent` / `whatsappOpenWa.sent` o `skipped` con el motivo.
+El cron en servidor ejecuta el job **directo en Node** (no pasa por HTTP), así no hay timeout con muchos WhatsApp.
+
+En la respuesta JSON busque `donation.whatsappOpenWa.sent` o `skipped` con el motivo.
 
 ---
 
