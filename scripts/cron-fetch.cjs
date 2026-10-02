@@ -20,7 +20,7 @@ function cronBaseUrls() {
   });
 }
 
-async function postCron(path) {
+async function postCron(pathWithQuery) {
   const secret = process.env.CRON_SECRET ?? "hemocentro-cron-dev";
   const bases = cronBaseUrls();
   if (!bases.length) {
@@ -30,7 +30,7 @@ async function postCron(path) {
 
   let lastErr = null;
   for (const base of bases) {
-    const url = `${base.replace(/\/$/, "")}${path}`;
+    const url = `${base.replace(/\/$/, "")}${pathWithQuery}`;
     try {
       const res = await fetch(url, {
         method: "POST",

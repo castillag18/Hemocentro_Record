@@ -14,7 +14,6 @@ import {
   googleCalendarConfigured,
 } from "./google-calendar";
 import { sendEmail, smtpConfigured } from "./email";
-import { debugOpenWaLog } from "./debug-openwa-log";
 import { formatDateBogota, formatTimeBogota, sitePhoneForMessages } from "./hemocentro-hours";
 import {
   buildSlotSelectionMessage,
@@ -116,19 +115,6 @@ async function confirmAppointment(options: {
       formattedTime: formatTimeBogota(options.scheduledAt),
     };
   }
-
-  // #region agent log
-  debugOpenWaLog(
-    "openwa-inbound.ts:confirmAppointment",
-    "confirmation labels",
-    {
-      scheduledAtIso: options.scheduledAt.toISOString(),
-      formattedTime: appointment.formattedTime,
-      formattedDate: appointment.formattedDate,
-    },
-    "T1",
-  );
-  // #endregion
 
   await prisma.appointment.create({
     data: {

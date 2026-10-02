@@ -56,3 +56,8 @@ Consulte **[docs/INSTALACION.md](docs/INSTALACION.md)** para:
 
 Next.js 16 · TypeScript · Tailwind v4 · Prisma · MySQL · OpenWA / WhatsApp Cloud API · Nodemailer
 # Hemocentro_Record
+
+
+Cron 3:00 AM
+cd /opt/Hemocentro_Record
+npm run import:donors:huav:install-cron

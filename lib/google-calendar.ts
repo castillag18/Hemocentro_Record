@@ -1,7 +1,6 @@
 import { google } from "googleapis";
 import type { Settings } from "@prisma/client";
 import { formatDateBogota, formatTimeBogota, sitePhoneForMessages } from "./hemocentro-hours";
-import { debugOpenWaLog } from "./debug-openwa-log";
 import { nextAppointmentSlot } from "./reminders";
 import { getCalendarAuth, googleCalendarConfigured } from "./google-oauth";
 import { prisma } from "./prisma";
@@ -72,20 +71,6 @@ export async function syncPendingAppointmentsToCalendar(settings: Settings) {
       failed += 1;
       const error = calendarApiErrorMessage(err);
       failures.push({ appointmentId: item.id, error });
-      // #region agent log
-      debugOpenWaLog(
-        "google-calendar.ts:sync",
-        "appointment sync failed",
-        {
-          appointmentId: item.id,
-          error,
-          donorEmailPresent: Boolean(item.donor.email?.trim()),
-          donorEmailValid: Boolean(calendarAttendeeEmail(item.donor.email)),
-          scheduledAtIso: item.scheduledAt.toISOString(),
-        },
-        "G1",
-      );
-      // #endregion
     }
   }
 

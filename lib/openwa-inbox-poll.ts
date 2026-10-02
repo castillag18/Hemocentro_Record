@@ -1,4 +1,3 @@
-import { debugOpenWaLog } from "./debug-openwa-log";
 import { getOpenWaFetchTimeoutMs } from "./fetch-timeout";
 import { openWaFetchQueued } from "./openwa-queue";
 import { prisma } from "./prisma";
@@ -129,12 +128,6 @@ export async function pollOpenWaInbox(settingsInput?: Awaited<ReturnType<typeof 
 
   try {
     const messages = await fetchRecentIncomingMessages(settings);
-    debugOpenWaLog(
-      "openwa-inbox-poll.ts:poll",
-      "incoming batch",
-      { count: messages.length },
-      "H4",
-    );
 
     for (const message of messages) {
       const messageId = message.id!;
@@ -199,13 +192,6 @@ export async function pollOpenWaInbox(settingsInput?: Awaited<ReturnType<typeof 
         where: { processedAt: { lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
       });
     }
-
-    debugOpenWaLog(
-      "openwa-inbox-poll.ts:poll",
-      "poll done",
-      { processed, skipped, skippedReasons: skippedReasons.slice(0, 5) },
-      "H4",
-    );
 
     return {
       processed,

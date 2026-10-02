@@ -5,4 +5,7 @@
 require("./load-env.cjs").loadEnv();
 const { postCron } = require("./cron-fetch.cjs");
 
-postCron("/api/cron/reminders");
+const force = process.env.CRON_REMINDERS_FORCE === "1" || process.argv.includes("--force");
+const path = force ? "/api/cron/reminders?force=1" : "/api/cron/reminders";
+
+postCron(path);

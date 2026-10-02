@@ -1,5 +1,4 @@
 import { getOpenWaFetchTimeoutMs } from "./fetch-timeout";
-import { debugOpenWaLog } from "./debug-openwa-log";
 import { openWaFetchQueued } from "./openwa-queue";
 
 const UUID_RE =
@@ -76,21 +75,8 @@ export async function resolveOpenWaSessionUuid(options: {
   const sessions = await listOpenWaSessions(options);
   const existing = sessions.find((s) => s.name === name);
   if (existing?.id) {
-    debugOpenWaLog(
-      "openwa-session.ts:resolve",
-      "session resolved by name",
-      { name, uuid: existing.id.slice(0, 8), status: existing.status ?? null, sessionCount: sessions.length },
-      "H2",
-    );
     return existing.id;
   }
-
-  debugOpenWaLog(
-    "openwa-session.ts:resolve",
-    "creating new OpenWA session (no name match)",
-    { name, sessionCount: sessions.length, rawSessionId: raw.slice(0, 12) },
-    "H2",
-  );
 
   const base = options.baseUrl.replace(/\/$/, "");
   const res = await openWaFetch(`${base}/api/sessions`, {

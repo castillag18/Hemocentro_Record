@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildBogotaSlot,
+  currentHourBogota,
   formatTimeBogota,
   sitePhoneForMessages,
   startOfBogotaDay,
@@ -12,6 +13,12 @@ describe("formatTimeBogota", () => {
     const slot = buildBogotaSlot(day, 15, 0);
     expect(slot.toISOString()).toBe("2026-10-02T20:00:00.000Z");
     expect(formatTimeBogota(slot)).toMatch(/03:00\s*p\.?\s*m\.?/i);
+  });
+});
+
+describe("currentHourBogota", () => {
+  it("devuelve 9 cuando en UTC son las 14:00 (Colombia UTC-5)", () => {
+    expect(currentHourBogota(new Date("2026-10-02T14:00:00.000Z"))).toBe(9);
   });
 });
 

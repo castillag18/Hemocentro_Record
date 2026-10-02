@@ -1,5 +1,4 @@
 import { fetchWithTimeout } from "./fetch-timeout";
-import { debugOpenWaLog } from "./debug-openwa-log";
 import { prisma } from "./prisma";
 import { normalizePhone } from "./whatsapp";
 import { openWaHeaders, resolveOpenWaSessionUuid } from "./openwa-session";
@@ -115,56 +114,15 @@ export async function findDonorByOpenWaContact(
 
   if (byChatId) {
     if (!phoneDigits || donorPhoneDigitsMatch(byChatId.phone, phoneDigits)) {
-      // #region agent log
-      debugOpenWaLog(
-        "openwa-contacts.ts:findDonor",
-        "matched by whatsappChatId",
-        {
-          chatKind: chatId.endsWith("@lid") ? "lid" : "other",
-          phoneDigitsLen: phoneDigits.length,
-          matchedBy: "whatsappChatId",
-        },
-        "H2",
-      );
-      // #endregion
       return byChatId;
     }
-    // #region agent log
-    debugOpenWaLog(
-      "openwa-contacts.ts:findDonor",
-      "whatsappChatId rejected (phone mismatch)",
-      { phoneDigitsLen: phoneDigits.length, matchedBy: "none_chatId_stale" },
-      "H2",
-    );
-    // #endregion
   }
 
   if (!phoneDigits) {
-    // #region agent log
-    debugOpenWaLog(
-      "openwa-contacts.ts:findDonor",
-      "no usable phone digits",
-      { chatKind: chatId.endsWith("@lid") ? "lid" : "other" },
-      "H1",
-    );
-    // #endregion
     return null;
   }
 
   const donor = await matchDonorByPhoneDigits(phoneDigits, true);
-
-  // #region agent log
-  debugOpenWaLog(
-    "openwa-contacts.ts:findDonor",
-    "phone lookup result",
-    {
-      phoneDigitsLen: phoneDigits.length,
-      matchedBy: donor ? "phone" : "none",
-      donorFound: Boolean(donor),
-    },
-    "H1",
-  );
-  // #endregion
 
   if (donor && chatId.includes("@") && donor.whatsappChatId !== chatId) {
     await prisma.donor

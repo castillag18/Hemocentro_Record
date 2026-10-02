@@ -10,6 +10,7 @@ import { getAutoReminderDonors } from "@/lib/eligibility";
 import { getSettings } from "@/lib/settings";
 import { sendRemindersToDonors } from "@/lib/send-reminders";
 import { getSatisfactionSurveyCandidates } from "@/lib/satisfaction-survey";
+import { currentHourBogota } from "@/lib/hemocentro-hours";
 
 export async function POST(request: Request) {
   const secret = request.headers.get("x-cron-secret");
@@ -23,10 +24,18 @@ export async function POST(request: Request) {
   const today = new Date();
 
   const settings = await getSettings();
-  const hour = today.getHours();
-  const withinHour = force || hour === settings.autoRemindersHour;
+  const hourBogota = currentHourBogota(today);
+  const withinHour = force || hourBogota === settings.autoRemindersHour;
 
   const summary: Record<string, unknown> = {
+    schedule: {
+      timeZone: "America/Bogota",
+      currentHourBogota: hourBogota,
+      autoRemindersEnabled: settings.autoRemindersEnabled,
+      autoRemindersHour: settings.autoRemindersHour,
+      withinRemindersHour: withinHour,
+      forced: force,
+    },
     skipped: [] as string[],
     donation: null as Record<string, unknown> | null,
     birthday: null as Record<string, unknown> | null,
@@ -93,7 +102,7 @@ export async function POST(request: Request) {
   }
 
   const satisfactionHour = settings.autoSatisfactionSurveyHour ?? 18;
-  const withinSatisfactionHour = force || hour === satisfactionHour;
+  const withinSatisfactionHour = force || hourBogota === satisfactionHour;
 
   if (settings.autoSatisfactionSurveyEnabled && withinSatisfactionHour) {
     const candidates = await getSatisfactionSurveyCandidates(today);

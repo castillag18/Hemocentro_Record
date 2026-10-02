@@ -10,24 +10,24 @@ const path = require("path");
 const { fetchOpenWa, resolveSessionUuid } = require("./openwa-http.cjs");
 
 const INTERVAL_MS = Number(process.env.OPENWA_WATCH_INTERVAL_MS) || 15_000;
-const logPath = path.join(process.cwd(), "logs", "openwa-debug-dc40f8.ndjson");
 const watchPath = path.join(process.cwd(), "logs", "openwa-session-watch.log");
 
-function append(payload) {
-  fs.mkdirSync(path.dirname(logPath), { recursive: true });
-  const line = `${JSON.stringify({ ...payload, timestamp: Date.now(), sessionId: "dc40f8" })}\n`;
-  fs.appendFileSync(logPath, line);
-  fs.appendFileSync(watchPath, `[${new Date().toISOString()}] ${payload.message} ${JSON.stringify(payload.data)}\n`);
+function append(message, data) {
+  fs.mkdirSync(path.dirname(watchPath), { recursive: true });
+  fs.appendFileSync(
+    watchPath,
+    `[${new Date().toISOString()}] ${message} ${JSON.stringify(data ?? {})}\n`,
+  );
 }
 
 async function tick() {
-  const base = (process.env.WHATSAPP_OPENWA_URL || "http://localhost:2785").replace(/\/$/, "");
+  const base = (process.env.WHATSAPP_OPENWA_URL || "http://127.0.0.1:2785").replace(/\/$/, "");
   const key = process.env.WHATSAPP_OPENWA_API_KEY || "";
   const stored = process.env.WHATSAPP_OPENWA_SESSION_ID || "default";
 
   const health = await fetchOpenWa(`${base}/api/health`, key, 8_000);
   if (!health.ok) {
-    append({ hypothesisId: "H3", location: "session-watch", message: "health fail", data: { error: health.error } });
+    append("health fail", { error: health.error });
     return;
   }
 
@@ -35,22 +35,16 @@ async function tick() {
   try {
     uuid = await resolveSessionUuid(base, key, stored);
   } catch (err) {
-    append({
-      hypothesisId: "H2",
-      location: "session-watch",
-      message: "resolve fail",
-      data: { err: err instanceof Error ? err.message : String(err) },
-    });
+    append("resolve fail", { err: err instanceof Error ? err.message : String(err) });
     return;
   }
 
   const session = await fetchOpenWa(`${base}/api/sessions/${encodeURIComponent(uuid)}`, key, 15_000);
   const status = session.data?.status ?? session.data?.state ?? "?";
-  append({
-    hypothesisId: "H1",
-    location: "session-watch",
-    message: "session status",
-    data: { uuid: uuid.slice(0, 8), status, phone: session.data?.phone ? "set" : "none" },
+  append("session status", {
+    uuid: uuid.slice(0, 8),
+    status,
+    phone: session.data?.phone ? "set" : "none",
   });
 }
 

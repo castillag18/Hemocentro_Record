@@ -79,6 +79,17 @@ export function startOfBogotaDay(date: Date) {
   return new Date(Date.UTC(year, month - 1, day, 5, 0, 0));
 }
 
+/** Hora entera 0–23 en Colombia (independiente de la zona horaria del servidor). */
+export function currentHourBogota(date = new Date()): number {
+  const hour = new Intl.DateTimeFormat("en-US", {
+    timeZone: HEMOCENTRO_TZ,
+    hour: "numeric",
+    hour12: false,
+  }).format(date);
+  const n = Number.parseInt(hour, 10);
+  return Number.isFinite(n) ? n : date.getHours();
+}
+
 export function formatDateBogota(date: Date): string {
   return date.toLocaleDateString("es-CO", {
     day: "2-digit",

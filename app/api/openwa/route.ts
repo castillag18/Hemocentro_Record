@@ -20,8 +20,6 @@ import {
 } from "@/lib/openwa";
 import { openWaFetchQueued } from "@/lib/openwa-queue";
 import { pollOpenWaInbox } from "@/lib/openwa-inbox-poll";
-import { debugOpenWaLog } from "@/lib/debug-openwa-log";
-
 type OpenWaBody = {
   action?: string;
   whatsappMode?: string;
@@ -302,31 +300,6 @@ export async function POST(request: Request) {
     return jsonError("Acción inválida");
   } catch (err) {
     const raw = err instanceof Error ? err.message : "Error OpenWA";
-    const friendly = friendlyOpenWaError(raw);
-    if (/limitó las peticiones|throttler/i.test(friendly)) {
-      // #region agent log
-      debugOpenWaLog(
-        "openwa/route.ts:POST",
-        "openwa throttle",
-        { action: body.action ?? "unknown" },
-        "R1",
-      );
-      // #endregion
-    }
-    if (/No se pudo conectar con OpenWA/i.test(friendly)) {
-      // #region agent log
-      debugOpenWaLog(
-        "openwa/route.ts:POST",
-        "openwa unreachable",
-        {
-          action: body.action ?? "unknown",
-          baseUrl: resolveOpenWaBaseUrl(settings.whatsappOpenWaUrl),
-          rawError: raw.slice(0, 120),
-        },
-        "R5",
-      );
-      // #endregion
-    }
-    return jsonError(friendly);
+    return jsonError(friendlyOpenWaError(raw));
   }
 }

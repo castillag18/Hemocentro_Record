@@ -1,5 +1,4 @@
 import { createRequire } from "module";
-import { debugOpenWaLog } from "../lib/debug-openwa-log";
 import { getOpenWaFetchTimeoutMs } from "../lib/fetch-timeout";
 import { pollOpenWaInbox } from "../lib/openwa-inbox-poll";
 import { openWaHeaders, resolveOpenWaSessionUuid } from "../lib/openwa-session";
@@ -73,17 +72,6 @@ async function preflightOpenWa(settings: Awaited<ReturnType<typeof getSettings>>
     };
     const status = String(sessionData.status ?? sessionData.state ?? "desconocido");
     console.log("preflight: estado sesión:", status);
-    debugOpenWaLog(
-      "run-openwa-inbox-poll-direct.ts:preflight",
-      "session preflight",
-      {
-        status,
-        uuid: sessionUuid.slice(0, 8),
-        ready: READY.has(status),
-        cwd: process.cwd(),
-      },
-      "H1",
-    );
     if (!READY.has(status)) {
       console.error(`\n❌ Sesión OpenWA en estado «${status}» (se requiere «ready»).`);
       const transient = new Set(["initializing", "authenticating", "connecting", "qr_ready"]);
@@ -117,12 +105,6 @@ async function preflightDatabase() {
     console.error("preflight: MySQL no disponible — poll omitido (sin llamadas a bandeja OpenWA)");
     console.error(`→ ${msg.split("\n")[0]}`);
     console.error("→ Desde VM: nc -zv 192.168.1.4 3306  ·  npm run db:check");
-    debugOpenWaLog(
-      "run-openwa-inbox-poll-direct.ts:preflight-db",
-      "mysql unreachable skip poll",
-      { hint: msg.split("\n")[0]?.slice(0, 120) },
-      "H5",
-    );
     process.exit(0);
   }
 }

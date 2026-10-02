@@ -1,8 +1,26 @@
 import fs from "fs";
 import path from "path";
+import type { Donor } from "@prisma/client";
 import type { RowDataPacket } from "mysql2";
 import { prisma } from "./prisma";
 import { withHuavConnection } from "./huav-db";
+
+export type HuavImportMode = "incremental" | "full";
+
+export type HuavDonorPayload = {
+  name: string;
+  documentId: string;
+  bloodType: string;
+  donationType: string;
+  gender: string | null;
+  birthDate: Date | null;
+  lastDonationDate: Date;
+  phone: string | null;
+  email: string | null;
+  preferredChannel: string;
+  accepted: boolean;
+  active: boolean;
+};
 
 const MAPPING = {
   name: "Nombre Donante",
@@ -18,6 +36,10 @@ const MAPPING = {
 } as const;
 
 const PLACEHOLDER_EMAILS = new Set(["notiene@gmail.com", "no tiene", "sin correo", "n/a", "na"]);
+
+const EXISTING_CHUNK = 400;
+const CREATE_BATCH = 500;
+const UPDATE_BATCH = 40;
 
 function normalizeDonationType(value: unknown) {
   const raw = String(value ?? "")
@@ -83,6 +105,12 @@ function startOfDay(date: Date) {
   return d;
 }
 
+function sameCalendarDay(a: Date | null, b: Date | null) {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  return startOfDay(a).getTime() === startOfDay(b).getTime();
+}
+
 function deriveDocumentId(name: string, phone: unknown, email: string, fallback: unknown) {
   const explicit = String(fallback ?? "").trim();
   if (explicit) return explicit;
@@ -100,38 +128,39 @@ function deriveDocumentId(name: string, phone: unknown, email: string, fallback:
   return slug ? `NOM-${slug}` : "";
 }
 
-function loadDonantesSql() {
+function resolveImportMode(options?: { mode?: HuavImportMode }): HuavImportMode {
+  if (options?.mode) return options.mode;
+  const env = process.env.HUAV_IMPORT_MODE?.trim().toLowerCase();
+  return env === "full" ? "full" : "incremental";
+}
+
+function lookbackDays() {
+  const raw = Number(process.env.HUAV_IMPORT_LOOKBACK_DAYS);
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 30;
+}
+
+export function loadDonantesSql(mode: HuavImportMode) {
+  const defaultFile =
+    mode === "full" ? "donantes_info.sql" : "donantes_info_nightly.sql";
+  const envKey = mode === "full" ? "HUAV_DONORS_SQL" : "HUAV_DONORS_SQL_INCREMENTAL";
   const sqlPath =
-    process.env.HUAV_DONORS_SQL?.trim() || path.join(process.cwd(), "donantes_info.sql");
+    process.env[envKey]?.trim() || path.join(process.cwd(), defaultFile);
   if (!fs.existsSync(/* turbopackIgnore: true */ sqlPath)) {
     throw new Error(`No se encontró el archivo SQL: ${sqlPath}`);
   }
   let sql = fs.readFileSync(/* turbopackIgnore: true */ sqlPath, "utf8").trim();
   if (!sql.endsWith(";")) sql += ";";
-  sql = sql.replace(/\bLIMIT\s+\d+\b/gi, "");
-  return { sql, sqlPath };
+  if (mode === "full") {
+    sql = sql.replace(/\bLIMIT\s+\d+\b/gi, "");
+  }
+  sql = sql.replace(/\{\{LOOKBACK_DAYS\}\}/g, String(lookbackDays()));
+  return { sql, sqlPath, mode };
 }
 
 type HuavRow = Record<string, unknown>;
 
-function mapRowsToDonors(rows: HuavRow[]) {
-  const byId = new Map<
-    string,
-    {
-      name: string;
-      documentId: string;
-      bloodType: string;
-      donationType: string;
-      gender: string | null;
-      birthDate: Date | null;
-      lastDonationDate: Date;
-      phone: string | null;
-      email: string | null;
-      preferredChannel: string;
-      accepted: boolean;
-      active: boolean;
-    }
-  >();
+export function mapRowsToDonors(rows: HuavRow[]) {
+  const byId = new Map<string, HuavDonorPayload>();
   let skipped = 0;
 
   for (const row of rows) {
@@ -152,7 +181,7 @@ function mapRowsToDonors(rows: HuavRow[]) {
       continue;
     }
 
-    const donor = {
+    const donor: HuavDonorPayload = {
       name,
       documentId,
       bloodType,
@@ -188,8 +217,86 @@ function mapRowsToDonors(rows: HuavRow[]) {
   return { byId, skipped };
 }
 
-export async function importDonorsFromHuav() {
-  const { sql, sqlPath } = loadDonantesSql();
+/** true si hay que escribir en BD (nuevo o datos distintos). */
+export function huavDonorRecordChanged(existing: Donor, incoming: HuavDonorPayload): boolean {
+  return !(
+    existing.name === incoming.name &&
+    existing.bloodType === incoming.bloodType &&
+    (existing.gender ?? null) === (incoming.gender ?? null) &&
+    existing.donationType === incoming.donationType &&
+    sameCalendarDay(existing.birthDate, incoming.birthDate) &&
+    sameCalendarDay(existing.lastDonationDate, incoming.lastDonationDate) &&
+    (existing.phone ?? null) === (incoming.phone ?? null) &&
+    (existing.email ?? null) === (incoming.email ?? null) &&
+    existing.accepted === incoming.accepted &&
+    existing.active === incoming.active &&
+    existing.preferredChannel === incoming.preferredChannel
+  );
+}
+
+async function loadExistingByDocumentIds(documentIds: string[]) {
+  const map = new Map<string, Donor>();
+  for (let i = 0; i < documentIds.length; i += EXISTING_CHUNK) {
+    const chunk = documentIds.slice(i, i + EXISTING_CHUNK);
+    const rows = await prisma.donor.findMany({
+      where: { documentId: { in: chunk } },
+    });
+    for (const row of rows) map.set(row.documentId, row);
+  }
+  return map;
+}
+
+async function applyHuavDonorsToDatabase(byId: Map<string, HuavDonorPayload>) {
+  const documentIds = Array.from(byId.keys());
+  const existingByDocId = await loadExistingByDocumentIds(documentIds);
+
+  const toCreate: HuavDonorPayload[] = [];
+  const toUpdate: { id: string; data: HuavDonorPayload }[] = [];
+  let unchanged = 0;
+
+  for (const donor of byId.values()) {
+    const existing = existingByDocId.get(donor.documentId);
+    if (!existing) {
+      toCreate.push(donor);
+      continue;
+    }
+    if (huavDonorRecordChanged(existing, donor)) {
+      toUpdate.push({ id: existing.id, data: donor });
+    } else {
+      unchanged += 1;
+    }
+  }
+
+  let created = 0;
+  for (let i = 0; i < toCreate.length; i += CREATE_BATCH) {
+    const batch = toCreate.slice(i, i + CREATE_BATCH);
+    const result = await prisma.donor.createMany({
+      data: batch,
+      skipDuplicates: true,
+    });
+    created += result.count;
+  }
+
+  let updated = 0;
+  for (let i = 0; i < toUpdate.length; i += UPDATE_BATCH) {
+    const batch = toUpdate.slice(i, i + UPDATE_BATCH);
+    await prisma.$transaction(
+      batch.map(({ id, data }) =>
+        prisma.donor.update({
+          where: { id },
+          data,
+        }),
+      ),
+    );
+    updated += batch.length;
+  }
+
+  return { created, updated, unchanged };
+}
+
+export async function importDonorsFromHuav(options?: { mode?: HuavImportMode }) {
+  const mode = resolveImportMode(options);
+  const { sql, sqlPath } = loadDonantesSql(mode);
 
   const rows = await withHuavConnection(async (connection) => {
     const [result] = await connection.query<(HuavRow & RowDataPacket)[]>(sql);
@@ -201,29 +308,17 @@ export async function importDonorsFromHuav() {
   }
 
   const { byId, skipped } = mapRowsToDonors(rows);
-  let created = 0;
-  let updated = 0;
-
-  for (const donor of byId.values()) {
-    const existing = await prisma.donor.findUnique({
-      where: { documentId: donor.documentId },
-    });
-    if (existing) {
-      await prisma.donor.update({ where: { id: existing.id }, data: donor });
-      updated += 1;
-    } else {
-      await prisma.donor.create({ data: donor });
-      created += 1;
-    }
-  }
+  const { created, updated, unchanged } = await applyHuavDonorsToDatabase(byId);
 
   return {
     source: "huav" as const,
+    mode,
     sqlFile: path.basename(sqlPath),
     rows: rows.length,
     unique: byId.size,
     created,
     updated,
+    unchanged,
     skipped,
   };
 }

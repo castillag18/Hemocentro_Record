@@ -174,8 +174,14 @@ npm run db:seed
 # Verificar conexión
 npm run db:check
 
-# Importar donantes desde donantes_info.sql (consulta directa a huav)
-npm run import:donors:huav
+# Sincronizar donantes (solo nuevos/cambios; consulta donantes_info_nightly.sql)
+npm run import:donors:huav:nightly
+
+# Importación completa (lenta; quita LIMIT de donantes_info.sql)
+npm run import:donors:huav:full
+
+# Cron diario 3:00 AM en el servidor Linux
+npm run import:donors:huav:install-cron
 ```
 
 > **Desarrollo local con Docker:** puede usar `mysql://root:password@localhost:3306/hemocentro` y `npm run db:up` en lugar de la BD HUAV.
@@ -540,15 +546,27 @@ CRON_SECRET="generar-secreto-cron-largo"
 npm run cron:reminders
 ```
 
-### 9.3 Programar en el servidor (Linux crontab)
+### 9.3 Programar en el servidor (Linux)
 
-Ejemplo: todos los días a las 8:00 AM:
+Active **Envío automático** y la **hora** (ej. 9) en **Configuración → General**. La app usa la **hora de Colombia** (`America/Bogota`), no la del reloj del servidor.
 
-```cron
-0 8 * * * cd /opt/recordatorio_hemocentro && /usr/bin/node scripts/run-cron.cjs >> /var/log/hemocentro-cron.log 2>&1
+Instale el cron (se ejecuta **cada hora**; solo envía cuando coincide la hora configurada):
+
+```bash
+cd /opt/Hemocentro_Record
+npm run cron:reminders:install-cron
 ```
 
-Active los envíos automáticos en **Configuración → Configuración general**.
+Log: `logs/reminders-cron.log`
+
+**Comprobar sin esperar a las 9:00:**
+
+```bash
+npm run cron:reminders          # solo envía si ahora es la hora configurada en Colombia
+npm run cron:reminders:force    # prueba de envío (ignora la hora)
+```
+
+En la respuesta JSON busque `donation.sent` / `whatsappOpenWa.sent` o `skipped` con el motivo.
 
 ---
 
@@ -667,7 +685,9 @@ http://192.168.1.50:3000
 | Comando | Descripción |
 |---|---|
 | `npm run import:donors` | Importar Excel de donantes |
-| `npm run import:donors:huav` | Importar desde BD HUAV (`donantes_info.sql`) |
+| `npm run import:donors:huav:nightly` | Sincronizar donantes HUAV (incremental, solo cambios) |
+| `npm run import:donors:huav:full` | Importación completa HUAV (lenta) |
+| `npm run import:donors:huav:install-cron` | Programar sincronización diaria a las 3:00 AM |
 | `npm run cron:reminders` | Ejecutar recordatorios automáticos |
 | `npm run openwa:register-webhook` | Registrar webhook OpenWA para respuestas WhatsApp |
 
