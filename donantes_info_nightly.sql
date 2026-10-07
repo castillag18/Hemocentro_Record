@@ -1,5 +1,3 @@
--- Sincronización nocturna (donaciones recientes). Ajuste el intervalo si hace falta.
--- Uso: cron 3:00 AM → npm run import:donors:huav:nightly
 SELECT
     CONCAT_WS(' ', p.DES_NAME, p.DES_SURNAME) AS `Nombre Donante`,
 
@@ -69,11 +67,16 @@ FROM
         COD_DONATIONKIND,
         COD_ACCEPTEDDONOR
     FROM donation
-    WHERE DAT_DONATION >= DATE_SUB(CURDATE(), INTERVAL {{LOOKBACK_DAYS}} DAY)
+    WHERE DAT_DONATION >= '2023-01-01'
+      AND (
+          COD_ACCEPTEDDONOR <> 'P'
+          OR COD_ACCEPTEDDONOR IS NULL
+      )
     ORDER BY
         DAT_DONATION DESC,
         TIM_DONATION DESC,
         ID_DONATION DESC
+    LIMIT 5000
 ) AS d
 
 INNER JOIN person AS p

@@ -67,11 +67,16 @@ FROM
         COD_DONATIONKIND,
         COD_ACCEPTEDDONOR
     FROM donation
+    WHERE DAT_DONATION >= '2023-01-01'
+      AND (
+          COD_ACCEPTEDDONOR <> 'P'
+          OR COD_ACCEPTEDDONOR IS NULL
+      )
     ORDER BY
         DAT_DONATION DESC,
         TIM_DONATION DESC,
         ID_DONATION DESC
-    LIMIT 1000
+    LIMIT 5000
 ) AS d
 
 INNER JOIN person AS p
