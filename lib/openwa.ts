@@ -210,7 +210,14 @@ export async function getOpenWaQr(options: {
   return { ...result, sessionUuid };
 }
 
-export async function getOpenWaSessionStatus(options: {
+const STATUS_CACHE_MS = 45_000;
+let sessionStatusCache: {
+  key: string;
+  expires: number;
+  value: Awaited<ReturnType<typeof getOpenWaSessionStatusUncached>>;
+} | null = null;
+
+async function getOpenWaSessionStatusUncached(options: {
   baseUrl: string;
   apiKey: string;
   sessionId: string;
@@ -237,6 +244,20 @@ export async function getOpenWaSessionStatus(options: {
   });
 
   return { ...result, sessionUuid };
+}
+
+export async function getOpenWaSessionStatus(options: {
+  baseUrl: string;
+  apiKey: string;
+  sessionId: string;
+}) {
+  const key = `${options.baseUrl.replace(/\/$/, "")}|${options.sessionId.trim() || "default"}`;
+  if (sessionStatusCache && sessionStatusCache.key === key && sessionStatusCache.expires > Date.now()) {
+    return sessionStatusCache.value;
+  }
+  const value = await getOpenWaSessionStatusUncached(options);
+  sessionStatusCache = { key, expires: Date.now() + STATUS_CACHE_MS, value };
+  return value;
 }
 
 export async function testOpenWaConnection(options: {

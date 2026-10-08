@@ -91,6 +91,7 @@ export async function sendOpenWaMessage(options: {
   replyToMessageId?: string;
   imageUrl?: string;
   appBaseUrl?: string;
+  skipDeliveryConfirm?: boolean;
 }) {
   if (options.imageUrl) {
     const chatId = toWhatsAppChatId(options.to);
@@ -134,6 +135,7 @@ export async function sendOpenWaMessage(options: {
     text: options.message,
     chatId: options.chatId,
     replyToMessageId: options.replyToMessageId,
+    skipDeliveryConfirm: options.skipDeliveryConfirm,
   });
 }
 

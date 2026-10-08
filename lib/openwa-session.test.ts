@@ -5,6 +5,7 @@ const mockFetch = vi.hoisted(() => vi.fn());
 vi.stubGlobal("fetch", mockFetch);
 
 import {
+  clearOpenWaSessionUuidCache,
   isOpenWaSessionUuid,
   normalizeOpenWaSessionName,
   resolveOpenWaSessionUuid,
@@ -27,6 +28,8 @@ function jsonResponse(body: unknown, status = 200) {
 
 describe("resolveOpenWaSessionUuid", () => {
   beforeEach(() => {
+    clearOpenWaSessionUuidCache();
+    process.env.OPENWA_MIN_INTERVAL_MS = "0";
     mockFetch.mockReset();
     mockFetch.mockImplementation(() => Promise.resolve(jsonResponse({})));
   });

@@ -58,15 +58,36 @@ async function openWaSessionExists(
   return res.ok;
 }
 
+const UUID_CACHE_MS = 5 * 60 * 1000;
+
+function sessionCacheKey(options: { baseUrl: string; sessionId: string }) {
+  return `${options.baseUrl.replace(/\/$/, "")}|${options.sessionId.trim() || "default"}`;
+}
+
+const uuidCache = new Map<string, { uuid: string; expires: number }>();
+
+export function clearOpenWaSessionUuidCache() {
+  uuidCache.clear();
+}
+
 export async function resolveOpenWaSessionUuid(options: {
   baseUrl: string;
   apiKey: string;
   sessionId: string;
 }) {
+  const cacheKey = sessionCacheKey(options);
+  const cached = uuidCache.get(cacheKey);
+  if (cached && cached.expires > Date.now()) {
+    return cached.uuid;
+  }
+
   const raw = options.sessionId?.trim() || "default";
   if (isOpenWaSessionUuid(raw)) {
     const exists = await openWaSessionExists(options, raw);
-    if (exists) return raw;
+    if (exists) {
+      uuidCache.set(cacheKey, { uuid: raw, expires: Date.now() + UUID_CACHE_MS });
+      return raw;
+    }
   }
 
   const name = normalizeOpenWaSessionName(
@@ -75,6 +96,7 @@ export async function resolveOpenWaSessionUuid(options: {
   const sessions = await listOpenWaSessions(options);
   const existing = sessions.find((s) => s.name === name);
   if (existing?.id) {
+    uuidCache.set(cacheKey, { uuid: existing.id, expires: Date.now() + UUID_CACHE_MS });
     return existing.id;
   }
 
@@ -93,7 +115,10 @@ export async function resolveOpenWaSessionUuid(options: {
   if (res.status === 409) {
     const again = await listOpenWaSessions(options);
     const found = again.find((s) => s.name === name);
-    if (found?.id) return found.id;
+    if (found?.id) {
+      uuidCache.set(cacheKey, { uuid: found.id, expires: Date.now() + UUID_CACHE_MS });
+      return found.id;
+    }
   }
 
   if (!res.ok) {
@@ -104,5 +129,6 @@ export async function resolveOpenWaSessionUuid(options: {
     throw new Error("OpenWA no devolvió el UUID de la sesión");
   }
 
+  uuidCache.set(cacheKey, { uuid: data.id, expires: Date.now() + UUID_CACHE_MS });
   return data.id;
 }

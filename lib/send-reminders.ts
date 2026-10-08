@@ -3,6 +3,12 @@ import { getSettings, whatsappApiConfigured } from "./settings";
 import { buildTemplateVars, interpolate } from "./templates";
 import { sendEmail, smtpConfigured } from "./email";
 import { persistDonorWhatsAppChatId } from "./openwa-contacts";
+import {
+  resolveOpenWaApiKey,
+  resolveOpenWaBaseUrl,
+  resolveOpenWaSessionId,
+} from "./settings";
+import { getOpenWaSessionStatus } from "./openwa";
 import { buildWhatsAppUrl, openWaConfigured, sendOpenWaMessage, sendWhatsAppApiMessage } from "./whatsapp";
 import { openWaAfterSendPause } from "./openwa-queue";
 import { getWhatsappDailyRemaining, getWhatsappSentTodayCount } from "./whatsapp-limit";
@@ -67,6 +73,25 @@ export async function sendRemindersToDonors(options: {
 
   const useWhatsappApi = whatsappApiConfigured(settings);
   const useOpenWa = openWaConfigured(settings);
+
+  let openWaReady = true;
+  let openWaBlockedReason = "";
+  if (useOpenWa && channels.includes("whatsapp")) {
+    try {
+      const status = await getOpenWaSessionStatus({
+        baseUrl: resolveOpenWaBaseUrl(settings.whatsappOpenWaUrl),
+        apiKey: resolveOpenWaApiKey(settings.whatsappOpenWaApiKey),
+        sessionId: resolveOpenWaSessionId(settings.whatsappOpenWaSessionId),
+      });
+      if (status.status.toLowerCase() !== "ready") {
+        openWaReady = false;
+        openWaBlockedReason = `Sesión OpenWA no lista (estado: ${status.status}). Vincule WhatsApp en Configuración.`;
+      }
+    } catch (err) {
+      openWaReady = false;
+      openWaBlockedReason = err instanceof Error ? err.message : "OpenWA no disponible";
+    }
+  }
 
   for (const donor of selected) {
     const vars = {
@@ -146,15 +171,25 @@ export async function sendRemindersToDonors(options: {
       }
 
       if (useOpenWa) {
+        if (!openWaReady) {
+          result.whatsappOpenWa.failed.push({
+            id: donor.id,
+            name: donor.name,
+            error: openWaBlockedReason,
+          });
+          await logReminder(donor, "whatsapp", "fallido", templateKind, referenceKey, openWaBlockedReason);
+          continue;
+        }
         try {
           const sendResult = await sendOpenWaMessage({
-            baseUrl: settings.whatsappOpenWaUrl,
-            apiKey: settings.whatsappOpenWaApiKey,
-            sessionId: settings.whatsappOpenWaSessionId,
+            baseUrl: resolveOpenWaBaseUrl(settings.whatsappOpenWaUrl),
+            apiKey: resolveOpenWaApiKey(settings.whatsappOpenWaApiKey),
+            sessionId: resolveOpenWaSessionId(settings.whatsappOpenWaSessionId),
             to: donor.phone,
             message,
             imageUrl,
             appBaseUrl,
+            skipDeliveryConfirm: true,
           });
           await persistDonorWhatsAppChatId(
             donor.id,

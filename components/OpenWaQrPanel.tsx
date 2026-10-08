@@ -28,8 +28,8 @@ type OpenWaStatusResponse = {
   inboxPollingEnabled?: boolean;
 };
 
-const STATUS_POLL_MS = 180_000;
-const QR_POLL_MS = 45_000;
+const STATUS_POLL_MS = 300_000;
+const QR_POLL_MS = 60_000;
 const THROTTLE_COOLDOWN_MS = 120_000;
 
 function isOpenWaThrottleError(message: string) {
@@ -66,6 +66,7 @@ export function OpenWaQrPanel({
   const [lastPollSummary, setLastPollSummary] = useState("");
   const throttleUntilRef = useRef(0);
   const qrAutoFetchDoneRef = useRef(false);
+  const lastKnownStatusRef = useRef("");
 
   const payload = useMemo(
     () => ({
@@ -131,7 +132,10 @@ export function OpenWaQrPanel({
           setNotice(qrData.message ?? "WhatsApp ya está vinculado.");
         }
         applySessionUuid(qrData.sessionUuid);
-        if (qrData.status) setStatus(qrData.status);
+        if (qrData.status) {
+          setStatus(qrData.status);
+          lastKnownStatusRef.current = qrData.status;
+        }
         setError("");
       } catch (err) {
         const msg = err instanceof Error ? err.message : "No se pudo obtener el QR";
@@ -151,6 +155,7 @@ export function OpenWaQrPanel({
         body: JSON.stringify({ action: "status", ...payload }),
       });
       setStatus(data.status);
+      lastKnownStatusRef.current = data.status;
       setSentToday(data.sentToday);
       setLimit(data.limit);
       applySessionUuid(data.sessionUuid);
@@ -159,7 +164,16 @@ export function OpenWaQrPanel({
       setError("");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "OpenWA no disponible";
-      if (isOpenWaThrottleError(msg)) markThrottle();
+      if (isOpenWaThrottleError(msg)) {
+        markThrottle();
+        if (lastKnownStatusRef.current) {
+          setStatus(lastKnownStatusRef.current);
+          setNotice(
+            "OpenWA limitó consultas de estado; la sesión puede seguir conectada. Espere 1–2 min antes de generar QR.",
+          );
+          return;
+        }
+      }
       setError(msg);
     }
   }, [enabled, config.whatsappMode, payload, applySessionUuid, inThrottleCooldown, markThrottle]);

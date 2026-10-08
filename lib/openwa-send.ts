@@ -220,6 +220,8 @@ export async function sendOpenWaTextMessage(
     text: string;
     chatId?: string;
     replyToMessageId?: string;
+    /** Recordatorios masivos: evita sondear la bandeja tras cada envío (reduce Throttler). */
+    skipDeliveryConfirm?: boolean;
   },
 ) {
   const normalizedPhone = normalizePhone(ctx.to);
@@ -262,6 +264,13 @@ export async function sendOpenWaTextMessage(
   const data = await parseOpenWaJson(res);
 
   if (res.status === 201 || res.ok) {
+    if (ctx.skipDeliveryConfirm) {
+      return {
+        messageId: data.messageId ?? "sent",
+        chatId,
+        deliveryStatus: "sent",
+      };
+    }
     const delivered = await confirmRecentOutgoingDelivery({
       ...ctx,
       sessionUuid,

@@ -180,6 +180,9 @@ npm run import:donors:huav:nightly
 # Importación completa (lenta; quita LIMIT de donantes_info.sql)
 npm run import:donors:huav:full
 
+# Repoblar desde cero: borra todos los donantes en hemocentro_app (+ citas, logs de recordatorio, sesiones WhatsApp) e importa full
+npm run import:donors:huav:repopulate -- --yes
+
 # Cron diario 3:00 AM en el servidor Linux
 npm run import:donors:huav:install-cron
 ```
@@ -689,6 +692,7 @@ http://192.168.1.50:3000
 | `npm run import:donors` | Importar Excel de donantes |
 | `npm run import:donors:huav:nightly` | Sincronizar donantes HUAV (incremental, solo cambios) |
 | `npm run import:donors:huav:full` | Importación completa HUAV (lenta) |
+| `npm run import:donors:huav:repopulate -- --yes` | Borrar donantes locales y volver a importar full (destructivo) |
 | `npm run import:donors:huav:install-cron` | Programar sincronización diaria a las 3:00 AM |
 | `npm run cron:reminders` | Ejecutar recordatorios automáticos |
 | `npm run openwa:register-webhook` | Registrar webhook OpenWA para respuestas WhatsApp |

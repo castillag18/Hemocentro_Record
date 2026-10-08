@@ -10,7 +10,7 @@ const path = require("path");
 
 const root = path.join(__dirname, "..");
 const pollScript = path.join(__dirname, "run-openwa-inbox-poll.cjs");
-const baseIntervalMs = Number(process.env.OPENWA_POLL_INTERVAL_MS) || 45_000;
+const baseIntervalMs = Number(process.env.OPENWA_POLL_INTERVAL_MS) || 90_000;
 const maxBackoffMs = Number(process.env.OPENWA_POLL_MAX_BACKOFF_MS) || 300_000;
 
 let nextDelayMs = baseIntervalMs;

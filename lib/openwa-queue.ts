@@ -1,6 +1,6 @@
 import { fetchWithTimeout, getOpenWaFetchTimeoutMs } from "./fetch-timeout";
 
-const DEFAULT_MIN_MS = 1200;
+const DEFAULT_MIN_MS = 2000;
 
 export function getOpenWaMinIntervalMs() {
   const raw = Number(process.env.OPENWA_MIN_INTERVAL_MS);
